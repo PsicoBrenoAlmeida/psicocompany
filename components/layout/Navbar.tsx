@@ -11,6 +11,7 @@ export default function Navbar() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
   const [profileData, setProfileData] = useState<{ full_name?: string; avatar_url?: string } | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const pathname = usePathname()
@@ -18,14 +19,12 @@ export default function Navbar() {
   const supabase = createClient()
 
   useEffect(() => {
-    // Verificar usuário e buscar dados do perfil
     const checkUser = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser()
         setUser(user)
         
         if (user) {
-          // Buscar dados do perfil
           const { data: profile } = await supabase
             .from('profiles')
             .select('full_name, avatar_url')
@@ -43,7 +42,6 @@ export default function Navbar() {
 
     checkUser()
 
-    // Escutar mudanças de autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null)
       
@@ -63,7 +61,15 @@ export default function Navbar() {
     return () => subscription.unsubscribe()
   }, [supabase])
 
-  // Fechar dropdown ao clicar fora
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 10)
+    }
+    
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -94,96 +100,114 @@ export default function Navbar() {
 
   return (
     <>
-      <nav className="navbar">
+      <nav className={`navbar ${scrolled ? 'scrolled' : ''}`}>
         <div className="navbar-container">
-          {/* Logo - sempre visível */}
-          <Link href="/" className="navbar-logo">
+          {/* Logo */}
+          <Link href={user ? "/dashboard" : "/"} className="navbar-logo">
             <span className="logo-text">Psicocompany</span>
           </Link>
 
-          {/* Conteúdo quando logado */}
-          {!loading && user && (
-            <>
-              {/* Links centrais */}
-              <div className="navbar-center">
-                <Link href="/psicologos" className={`navbar-link ${isActive('/psicologos') ? 'active' : ''}`}>
-                  Psicólogos
-                </Link>
-              </div>
-
-              {/* Avatar e dropdown */}
-              <div className="navbar-profile" ref={dropdownRef}>
-                <button
-                  className="profile-button"
-                  onClick={() => setDropdownOpen(!dropdownOpen)}
-                  aria-label="Menu do perfil"
-                >
-                  {profileData?.avatar_url ? (
-                    <img 
-                      src={profileData.avatar_url} 
-                      alt="Avatar" 
-                      className="profile-avatar"
-                    />
-                  ) : (
-                    <div className="profile-avatar-placeholder">
-                      {getInitials(profileData?.full_name, user.email)}
-                    </div>
-                  )}
-                </button>
-
-                {/* Dropdown Menu */}
-                <div className={`profile-dropdown ${dropdownOpen ? 'active' : ''}`}>
-                  <div className="dropdown-header">
-                    <div className="dropdown-name">
-                      {profileData?.full_name || 'Usuário'}
-                    </div>
-                    <div className="dropdown-email">{user.email}</div>
-                  </div>
-                  
-                  <div className="dropdown-divider"></div>
-                  
-                  <Link 
-                    href="/perfil" 
-                    className="dropdown-item"
-                    onClick={() => setDropdownOpen(false)}
-                  >
-                    <span className="dropdown-icon">👤</span>
-                    Meu Perfil
-                  </Link>
-                  
-                  <Link 
-                    href="/configuracoes" 
-                    className="dropdown-item"
-                    onClick={() => setDropdownOpen(false)}
-                  >
-                    <span className="dropdown-icon">⚙️</span>
-                    Configurações
-                  </Link>
-                  
-                  <div className="dropdown-divider"></div>
-                  
-                  <button 
-                    className="dropdown-item dropdown-logout"
-                    onClick={handleLogout}
-                  >
-                    <span className="dropdown-icon">🚪</span>
-                    Sair
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* Botões quando não logado */}
-          {!loading && !user && (
-            <div className="navbar-auth">
-              <Link href="/login" className="auth-link">
-                Entrar
-              </Link>
-              <Link href="/signup" className="auth-button">
-                Começar agora
-              </Link>
+          {/* Loading skeleton */}
+          {loading ? (
+            <div className="navbar-skeleton">
+              <div className="skeleton-btn"></div>
+              <div className="skeleton-btn primary"></div>
             </div>
+          ) : (
+            <>
+              {/* PRÉ-LOGIN */}
+              {!user && (
+                <div className="navbar-auth">
+                  <Link href="/login" className="btn-login">
+                    Entrar
+                  </Link>
+                  <Link href="/signup" className="btn-signup">
+                    Criar conta
+                  </Link>
+                </div>
+              )}
+
+              {/* PÓS-LOGIN */}
+              {user && (
+                <>
+                  <div className="navbar-center">
+                    <Link 
+                      href="/dashboard" 
+                      className={`nav-link ${isActive('/dashboard') ? 'active' : ''}`}
+                      title="Minhas sessões e histórico"
+                    >
+                      Dashboard
+                    </Link>
+                    
+                    <Link 
+                      href="/" 
+                      className={`nav-link ${isActive('/') ? 'active' : ''}`}
+                      title="Buscar psicólogos"
+                    >
+                      Psicólogos
+                    </Link>
+                  </div>
+
+                  <div className="navbar-profile" ref={dropdownRef}>
+                    <button
+                      className="profile-button"
+                      onClick={() => setDropdownOpen(!dropdownOpen)}
+                      aria-label="Menu do perfil"
+                    >
+                      {profileData?.avatar_url ? (
+                        <img 
+                          src={profileData.avatar_url} 
+                          alt="Avatar" 
+                          className="avatar"
+                        />
+                      ) : (
+                        <div className="avatar-placeholder">
+                          {getInitials(profileData?.full_name, user.email)}
+                        </div>
+                      )}
+                    </button>
+
+                    {dropdownOpen && (
+                      <div className="dropdown-menu">
+                        <div className="dropdown-header">
+                          <div className="dropdown-name">
+                            {profileData?.full_name || 'Usuário'}
+                          </div>
+                          <div className="dropdown-email">{user.email}</div>
+                        </div>
+                        
+                        <div className="dropdown-divider"></div>
+                        
+                        <Link 
+                          href="/perfil" 
+                          className="dropdown-item"
+                          onClick={() => setDropdownOpen(false)}
+                        >
+                          Meu Perfil
+                        </Link>
+                        
+                        <Link 
+                          href="/configuracoes" 
+                          className="dropdown-item"
+                          onClick={() => setDropdownOpen(false)}
+                        >
+                          Configurações
+                        </Link>
+                        
+                        <div className="dropdown-divider"></div>
+                        
+                        <button 
+                          className="dropdown-item logout"
+                          onClick={handleLogout}
+                        >
+                          Sair
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </>
           )}
         </div>
       </nav>
@@ -194,81 +218,186 @@ export default function Navbar() {
           top: 0;
           left: 0;
           right: 0;
-          height: 64px;
-          background: rgba(255, 255, 255, 0.95);
+          height: 72px;
+          background: rgba(255, 255, 255, 0.98);
           backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
           border-bottom: 1px solid rgba(124, 101, 181, 0.08);
           z-index: 1000;
           transition: all 0.3s ease;
         }
 
+        .navbar.scrolled {
+          box-shadow: 0 4px 30px rgba(124, 101, 181, 0.12);
+        }
+
         .navbar-container {
-          max-width: 1200px;
+          max-width: 1400px;
           margin: 0 auto;
-          padding: 0 24px;
+          padding: 0 40px;
           height: 100%;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          position: relative;
         }
 
-        /* Logo */
         .navbar-logo {
           text-decoration: none;
-          display: flex;
-          align-items: center;
-          gap: 8px;
           transition: transform 0.3s ease;
+          flex-shrink: 0;
         }
 
         .navbar-logo:hover {
-          transform: translateY(-1px);
+          transform: scale(1.05);
         }
 
         .logo-text {
-          font-size: 24px;
+          font-size: 26px;
           font-weight: 900;
           background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
           letter-spacing: -0.5px;
+          white-space: nowrap;
         }
 
-        /* Links centrais */
+        /* Skeleton Loading */
+        .navbar-skeleton {
+          display: flex;
+          gap: 12px;
+          align-items: center;
+        }
+
+        .skeleton-btn {
+          height: 36px;
+          width: 80px;
+          border-radius: 10px;
+          background: linear-gradient(90deg, #e8e4f7 0%, #ddd8f0 50%, #e8e4f7 100%);
+          background-size: 200% 100%;
+          animation: shimmer 1.5s infinite;
+        }
+
+        .skeleton-btn.primary {
+          width: 120px;
+        }
+
+        @keyframes shimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+
+        /* PRÉ-LOGIN */
+        .navbar-auth {
+          display: flex;
+          align-items: center;
+          gap: 40px;
+        }
+
+        .btn-login {
+          text-decoration: none;
+          color: #3c2e50;
+          font-weight: 600;
+          font-size: 15px;
+          padding: 10px 20px;
+          border-radius: 10px;
+          transition: all 0.3s ease;
+          white-space: nowrap;
+        }
+
+        .btn-login:hover {
+          background: rgba(169, 150, 221, 0.1);
+          color: #7c65b5;
+        }
+
+        .btn-signup {
+          background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
+          color: #ffffff;
+          padding: 10px 24px;
+          border-radius: 10px;
+          font-weight: 600;
+          font-size: 15px;
+          box-shadow: 0 4px 15px rgba(124, 101, 181, 0.25);
+          text-decoration: none;
+          white-space: nowrap;
+          transition: all 0.3s ease;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .btn-signup::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: linear-gradient(135deg, #6952a0 0%, #8b72c4 100%);
+          opacity: 0;
+          transition: opacity 0.3s ease;
+        }
+
+        .btn-signup:hover::before {
+          opacity: 1;
+        }
+
+        .btn-signup:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 25px rgba(124, 101, 181, 0.4);
+        }
+
+        /* PÓS-LOGIN - CENTRO */
         .navbar-center {
+          display: flex;
+          align-items: center;
+          gap: 200px;
           position: absolute;
           left: 50%;
           transform: translateX(-50%);
-          display: flex;
-          gap: 8px;
         }
 
-        .navbar-link {
-          padding: 8px 20px;
-          border-radius: 20px;
-          color: #2d1f3e;
-          font-weight: 500;
-          font-size: 15px;
+        .nav-link {
           text-decoration: none;
+          color: #3c2e50;
+          font-weight: 600;
+          font-size: 15px;
+          padding: 10px 20px;
+          border-radius: 10px;
           transition: all 0.3s ease;
+          white-space: nowrap;
           position: relative;
+          overflow: hidden;
         }
 
-        .navbar-link:hover {
-          background: rgba(124, 101, 181, 0.08);
+        .nav-link::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: -100%;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(169, 150, 221, 0.1), transparent);
+          transition: left 0.5s ease;
+        }
+
+        .nav-link:hover::before {
+          left: 100%;
+        }
+
+        .nav-link:hover {
+          background: rgba(169, 150, 221, 0.1);
           color: #7c65b5;
         }
 
-        .navbar-link.active {
-          background: rgba(124, 101, 181, 0.12);
+        .nav-link.active {
+          background: rgba(124, 101, 181, 0.15);
           color: #7c65b5;
+          font-weight: 700;
         }
 
-        /* Perfil e Dropdown */
         .navbar-profile {
           position: relative;
+          flex-shrink: 0;
         }
 
         .profile-button {
@@ -276,64 +405,65 @@ export default function Navbar() {
           border: none;
           padding: 0;
           cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: transform 0.3s ease;
+          transition: transform 0.2s ease;
         }
 
         .profile-button:hover {
           transform: scale(1.05);
         }
 
-        .profile-avatar,
-        .profile-avatar-placeholder {
-          width: 40px;
-          height: 40px;
+        .avatar,
+        .avatar-placeholder {
+          width: 42px;
+          height: 42px;
           border-radius: 50%;
           border: 2px solid transparent;
-          transition: border-color 0.3s ease;
+          background: linear-gradient(white, white) padding-box,
+                      linear-gradient(135deg, #7c65b5, #a996dd) border-box;
+          transition: all 0.2s ease;
         }
 
-        .profile-avatar {
+        .avatar {
           object-fit: cover;
         }
 
-        .profile-avatar-placeholder {
+        .avatar-placeholder {
           background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
           color: white;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-weight: 600;
-          font-size: 14px;
+          font-weight: 700;
+          font-size: 15px;
         }
 
-        .profile-button:hover .profile-avatar,
-        .profile-button:hover .profile-avatar-placeholder {
-          border-color: #7c65b5;
+        .profile-button:hover .avatar,
+        .profile-button:hover .avatar-placeholder {
+          box-shadow: 0 4px 16px rgba(124, 101, 181, 0.3);
         }
 
-        /* Dropdown */
-        .profile-dropdown {
+        .dropdown-menu {
           position: absolute;
           top: calc(100% + 12px);
           right: 0;
           background: white;
-          border-radius: 12px;
-          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
+          border-radius: 14px;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
           min-width: 240px;
-          opacity: 0;
-          visibility: hidden;
-          transform: translateY(-10px);
-          transition: all 0.3s ease;
           overflow: hidden;
+          animation: dropdownFade 0.2s ease;
+          border: 1px solid rgba(124, 101, 181, 0.1);
         }
 
-        .profile-dropdown.active {
-          opacity: 1;
-          visibility: visible;
-          transform: translateY(0);
+        @keyframes dropdownFade {
+          from {
+            opacity: 0;
+            transform: translateY(-8px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
 
         .dropdown-header {
@@ -342,30 +472,30 @@ export default function Navbar() {
         }
 
         .dropdown-name {
-          font-weight: 600;
+          font-weight: 700;
           color: #2d1f3e;
-          font-size: 14px;
+          font-size: 15px;
           margin-bottom: 4px;
         }
 
         .dropdown-email {
-          font-size: 12px;
+          font-size: 13px;
           color: #6b5d7a;
         }
 
         .dropdown-divider {
           height: 1px;
-          background: #e5e5e5;
+          background: rgba(124, 101, 181, 0.1);
+          margin: 8px 0;
         }
 
         .dropdown-item {
-          display: flex;
-          align-items: center;
-          gap: 12px;
+          display: block;
           padding: 12px 16px;
           color: #2d1f3e;
           text-decoration: none;
           font-size: 14px;
+          font-weight: 500;
           transition: all 0.2s ease;
           background: none;
           border: none;
@@ -379,82 +509,71 @@ export default function Navbar() {
           color: #7c65b5;
         }
 
-        .dropdown-icon {
-          font-size: 18px;
-          width: 24px;
-          text-align: center;
-        }
-
-        .dropdown-logout:hover {
+        .dropdown-item.logout:hover {
           background: rgba(239, 68, 68, 0.08);
           color: #ef4444;
         }
 
-        /* Botões de autenticação */
-        .navbar-auth {
-          display: flex;
-          align-items: center;
-          gap: 16px;
+        @media (max-width: 900px) {
+          .navbar-container {
+            padding: 0 24px;
+          }
+
+          .navbar-center {
+            position: static;
+            transform: none;
+            gap: 12px;
+          }
+
+          .nav-link {
+            padding: 8px 14px;
+            font-size: 14px;
+          }
         }
 
-        .auth-link {
-          color: #6b5d7a;
-          text-decoration: none;
-          font-weight: 500;
-          font-size: 15px;
-          padding: 8px 16px;
-          border-radius: 8px;
-          transition: all 0.3s ease;
-        }
+        @media (max-width: 640px) {
+          .navbar {
+            height: 64px;
+          }
 
-        .auth-link:hover {
-          color: #7c65b5;
-          background: rgba(124, 101, 181, 0.08);
-        }
-
-        .auth-button {
-          background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
-          color: white;
-          text-decoration: none;
-          font-weight: 600;
-          font-size: 15px;
-          padding: 10px 24px;
-          border-radius: 24px;
-          transition: all 0.3s ease;
-          box-shadow: 0 4px 15px rgba(124, 101, 181, 0.25);
-        }
-
-        .auth-button:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 6px 20px rgba(124, 101, 181, 0.35);
-        }
-
-        /* Mobile */
-        @media (max-width: 768px) {
           .navbar-container {
             padding: 0 16px;
           }
 
           .logo-text {
-            font-size: 20px;
+            font-size: 22px;
+          }
+
+          .btn-login,
+          .btn-signup {
+            padding: 8px 16px;
+            font-size: 14px;
           }
 
           .navbar-center {
             display: none;
           }
 
-          .auth-link {
-            font-size: 14px;
-            padding: 6px 12px;
+          .avatar,
+          .avatar-placeholder {
+            width: 38px;
+            height: 38px;
           }
 
-          .auth-button {
-            font-size: 14px;
-            padding: 8px 20px;
+          .dropdown-menu {
+            right: -8px;
+            min-width: 90vw;
+            max-width: 280px;
+          }
+        }
+
+        @media (max-width: 400px) {
+          .btn-login {
+            display: none;
           }
 
-          .profile-dropdown {
-            right: -16px;
+          .logo-text {
+            font-size: 20px;
           }
         }
       `}</style>

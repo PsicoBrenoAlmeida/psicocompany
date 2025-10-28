@@ -23,43 +23,32 @@ export default function Footer() {
                 </p>
                 <div className="footer-badges">
                   <span className="badge">🔒 100% Seguro</span>
-                  <span className="badge">✨ +1000 Psicólogos</span>
+                  <span className="badge">✨ Psicólogos Verificados</span>
                 </div>
               </div>
 
-              {/* Links rápidos */}
+              {/* Soluções */}
               <div className="footer-section">
-                <h4 className="footer-title">Para Você</h4>
-                <ul className="footer-list">
-                  <li><Link href="/psicologos">Encontrar Psicólogo</Link></li>
-                  <li><Link href="/como-funciona">Como Funciona</Link></li>
-                  <li><Link href="/precos">Preços e Planos</Link></li>
-                  <li><Link href="/blog">Blog</Link></li>
-                </ul>
-              </div>
-
-              {/* Para psicólogos */}
-              <div className="footer-section">
-                <h4 className="footer-title">Para Psicólogos</h4>
+                <h4 className="footer-title">Soluções</h4>
                 <ul className="footer-list">
                   <li><Link href="/seja-psicologo">Seja um Parceiro</Link></li>
-                  <li><Link href="/beneficios">Benefícios</Link></li>
-                  <li><Link href="/central-psicologo">Central do Psicólogo</Link></li>
+                  <li><Link href="/academy">Academy</Link></li>
+                  <li><Link href="/empresas">Para Empresas</Link></li>
+                  <li><Link href="/ajuda">Central de Ajuda</Link></li>
                 </ul>
               </div>
 
-              {/* Suporte */}
+              {/* Legal */}
               <div className="footer-section">
-                <h4 className="footer-title">Suporte</h4>
+                <h4 className="footer-title">Legal</h4>
                 <ul className="footer-list">
-                  <li><Link href="/ajuda">Central de Ajuda</Link></li>
-                  <li><Link href="/contato">Fale Conosco</Link></li>
                   <li><Link href="/termos">Termos de Uso</Link></li>
                   <li><Link href="/privacidade">Privacidade</Link></li>
+                  <li><Link href="/contato">Contato</Link></li>
                 </ul>
               </div>
 
-              {/* Contato e redes */}
+              {/* Conecte-se */}
               <div className="footer-section">
                 <h4 className="footer-title">Conecte-se</h4>
                 <div className="footer-social">
@@ -81,7 +70,7 @@ export default function Footer() {
                 </div>
                 <div className="contact-info">
                   <a href="mailto:contato@psicocompany.com.br" className="contact-link">
-                    contato@psicocompany.com.br
+                    📧 contato@psicocompany.com.br
                   </a>
                 </div>
               </div>
@@ -133,7 +122,7 @@ export default function Footer() {
 
         .footer-content {
           display: grid;
-          grid-template-columns: 2fr 1fr 1fr 1fr 1.5fr;
+          grid-template-columns: 2fr 1fr 1fr 1.5fr;
           gap: 48px;
         }
 
@@ -258,6 +247,9 @@ export default function Footer() {
           font-size: 14px;
           text-decoration: none;
           transition: color 0.3s ease;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
         }
 
         .contact-link:hover {
@@ -302,12 +294,12 @@ export default function Footer() {
         /* Responsivo */
         @media (max-width: 1024px) {
           .footer-content {
-            grid-template-columns: 2fr 1fr 1fr;
+            grid-template-columns: 1fr 1fr;
             gap: 32px;
           }
 
-          .footer-section:last-child {
-            grid-column: span 3;
+          .footer-brand {
+            grid-column: span 2;
           }
         }
 
@@ -321,11 +313,8 @@ export default function Footer() {
             gap: 32px;
           }
 
-          .footer-section:last-child {
-            grid-column: span 1;
-          }
-
           .footer-brand {
+            grid-column: span 1;
             padding-right: 0;
             text-align: center;
           }
@@ -343,6 +332,10 @@ export default function Footer() {
           }
 
           .footer-badges {
+            justify-content: center;
+          }
+
+          .contact-link {
             justify-content: center;
           }
         }

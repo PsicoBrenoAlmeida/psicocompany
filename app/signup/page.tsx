@@ -5,175 +5,128 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/utils/supabaseClient'
-import Button from '@/components/ui/Button'
-import Input from '@/components/ui/Input'
-import Card from '@/components/ui/Card'
-import { useToast } from '@/components/ui/Toast'
 
 export default function SignupPage() {
-  const router = useRouter()
   const supabase = createClient()
-  const { showToast } = useToast()
-  
-  // Estados do formulário
-  const [fullName, setFullName] = useState('')
+  const router = useRouter()
+
+  const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+
+  // Dados do paciente
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [fullName, setFullName] = useState('')
+  const [phone, setPhone] = useState('')
   const [acceptTerms, setAcceptTerms] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [errors, setErrors] = useState<{
-    fullName?: string
-    email?: string
-    password?: string
-    confirmPassword?: string
-    terms?: string
-  }>({})
 
-  // Validação de email
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
+  const formatPhone = (value: string) => {
+    const numbers = value.replace(/\D/g, '')
+    if (numbers.length <= 2) return numbers
+    if (numbers.length <= 6) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`
+    if (numbers.length <= 10) return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`
+    return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`
+  }
+
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     return emailRegex.test(email)
   }
 
-  // Validação de senha forte
-  const validatePassword = (password: string) => {
-    if (password.length < 6) {
-      return 'A senha deve ter no mínimo 6 caracteres'
-    }
-    // Opcional: adicionar mais regras de senha forte
-    // if (!/[A-Z]/.test(password)) {
-    //   return 'A senha deve conter pelo menos uma letra maiúscula'
-    // }
-    // if (!/[0-9]/.test(password)) {
-    //   return 'A senha deve conter pelo menos um número'
-    // }
-    return null
-  }
-
-  // Validação completa do formulário
   const validateForm = () => {
-    const newErrors: typeof errors = {}
-    
-    // Validar nome
     if (!fullName.trim()) {
-      newErrors.fullName = 'Nome completo é obrigatório'
-    } else if (fullName.trim().length < 3) {
-      newErrors.fullName = 'Nome deve ter pelo menos 3 caracteres'
+      setMessage({ type: 'error', text: 'Nome completo é obrigatório' })
+      return false
     }
-    
-    // Validar email
-    if (!email) {
-      newErrors.email = 'E-mail é obrigatório'
-    } else if (!validateEmail(email)) {
-      newErrors.email = 'E-mail inválido'
+
+    if (!email.trim() || !validateEmail(email)) {
+      setMessage({ type: 'error', text: 'Email válido é obrigatório' })
+      return false
     }
-    
-    // Validar senha
-    if (!password) {
-      newErrors.password = 'Senha é obrigatória'
-    } else {
-      const passwordError = validatePassword(password)
-      if (passwordError) {
-        newErrors.password = passwordError
-      }
+
+    if (password.length < 6) {
+      setMessage({ type: 'error', text: 'Senha deve ter no mínimo 6 caracteres' })
+      return false
     }
-    
-    // Validar confirmação de senha
-    if (!confirmPassword) {
-      newErrors.confirmPassword = 'Confirme sua senha'
-    } else if (password !== confirmPassword) {
-      newErrors.confirmPassword = 'As senhas não coincidem'
+
+    if (password !== confirmPassword) {
+      setMessage({ type: 'error', text: 'As senhas não coincidem' })
+      return false
     }
-    
-    // Validar termos
+
     if (!acceptTerms) {
-      newErrors.terms = 'Você deve aceitar os termos de uso'
+      setMessage({ type: 'error', text: 'Você deve aceitar os termos de uso' })
+      return false
     }
-    
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+
+    return true
   }
 
-  // Submit do formulário
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!validateForm()) {
-      showToast('Por favor, corrija os erros no formulário', 'error')
-      return
-    }
-    
-    setLoading(true)
+  const handleSignup = async () => {
+    if (!validateForm()) return
 
     try {
-      // Criar conta no Supabase Auth
-      const { data, error } = await supabase.auth.signUp({
+      setLoading(true)
+      setMessage(null)
+
+      // 1. Criar usuário no Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            full_name: fullName
+            full_name: fullName,
+            user_type: 'patient'
           }
         }
       })
 
-      if (error) {
-        // Tratamento de erros específicos do Supabase
-        let message = 'Erro ao criar conta'
-        
-        if (error.message.includes('already registered')) {
-          message = 'Este e-mail já está cadastrado'
-        } else if (error.message.includes('invalid')) {
-          message = 'Dados inválidos. Verifique as informações'
-        } else if (error.message.includes('weak')) {
-          message = 'Senha muito fraca. Use uma senha mais forte'
-        } else {
-          message = error.message
-        }
-        
-        showToast(message, 'error')
-        setLoading(false)
-        return
-      }
+      if (authError) throw authError
+      if (!authData.user) throw new Error('Erro ao criar usuário')
 
-      const userId = data.user?.id
-      if (userId) {
-        // Criar registros nas tabelas profiles e patients
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            user_id: userId,
-            full_name: fullName,
-            role: 'patient'
-          })
+      // 2. Criar perfil básico
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          user_id: authData.user.id,
+          user_type: 'patient',
+          full_name: fullName,
+          email: email,
+          phone: phone || null
+        })
 
-        if (profileError) {
-          console.error('Erro ao criar perfil:', profileError)
-        }
+      if (profileError) throw profileError
 
-        const { error: patientError } = await supabase
-          .from('patients')
-          .insert({
-            user_id: userId
-          })
+      // 3. Criar registro de paciente
+      const { error: patientError } = await supabase
+        .from('patients')
+        .insert({
+          user_id: authData.user.id
+        })
 
-        if (patientError) {
-          console.error('Erro ao criar registro de paciente:', patientError)
-        }
-      }
+      if (patientError) throw patientError
 
-      // Sucesso
-      showToast('Conta criada com sucesso! Redirecionando...', 'success')
-      
-      // Aguardar um pouco para mostrar a mensagem antes de redirecionar
+      // 4. Sucesso
+      setMessage({ 
+        type: 'success', 
+        text: 'Conta criada com sucesso! Redirecionando...' 
+      })
+
       setTimeout(() => {
-        router.push('/')
-      }, 1500)
-      
-    } catch (err) {
-      console.error('Erro inesperado:', err)
-      showToast('Ocorreu um erro inesperado. Tente novamente.', 'error')
+        router.push('/dashboard')
+      }, 2000)
+
+    } catch (error: any) {
+      console.error('Erro no cadastro:', error)
+      setMessage({ 
+        type: 'error', 
+        text: error.message || 'Erro ao criar conta' 
+      })
+    } finally {
       setLoading(false)
     }
   }
@@ -217,108 +170,91 @@ export default function SignupPage() {
 
           {/* Lado direito - Formulário */}
           <div className="form-side">
-            <Card variant="elevated" padding="lg" className="signup-card">
+            <div className="signup-card">
               <div className="form-header">
                 <h2 className="form-title">Criar conta gratuita</h2>
                 <p className="form-subtitle">Preencha seus dados para começar</p>
               </div>
 
-              <form onSubmit={handleSubmit} noValidate>
-                <Input
-                  label="Nome completo"
-                  type="text"
-                  placeholder="João da Silva"
-                  value={fullName}
-                  onChange={(e) => {
-                    setFullName(e.target.value)
-                    setErrors({...errors, fullName: undefined})
-                  }}
-                  onBlur={() => {
-                    if (fullName && fullName.trim().length < 3) {
-                      setErrors({...errors, fullName: 'Nome deve ter pelo menos 3 caracteres'})
-                    }
-                  }}
-                  error={errors.fullName}
-                  required
-                  autoFocus
-                />
+              <form onSubmit={(e) => { e.preventDefault(); handleSignup(); }}>
+                <div className="form-group">
+                  <label>Nome completo *</label>
+                  <input
+                    type="text"
+                    placeholder="João da Silva"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    autoFocus
+                  />
+                </div>
 
-                <Input
-                  label="E-mail"
-                  type="email"
-                  placeholder="seu@email.com"
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value)
-                    setErrors({...errors, email: undefined})
-                  }}
-                  onBlur={() => {
-                    if (email && !validateEmail(email)) {
-                      setErrors({...errors, email: 'E-mail inválido'})
-                    }
-                  }}
-                  error={errors.email}
-                  hint="Usaremos para login e comunicações importantes"
-                  required
-                />
+                <div className="form-group">
+                  <label>E-mail *</label>
+                  <input
+                    type="email"
+                    placeholder="seu@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                  <span className="hint">Usaremos para login e comunicações importantes</span>
+                </div>
 
-                <Input
-                  label="Senha"
-                  type="password"
-                  placeholder="••••••••"
-                  showPasswordToggle
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value)
-                    setErrors({...errors, password: undefined})
-                    // Verificar confirmação de senha em tempo real
-                    if (confirmPassword && e.target.value !== confirmPassword) {
-                      setErrors({...errors, confirmPassword: 'As senhas não coincidem'})
-                    } else if (confirmPassword) {
-                      setErrors({...errors, confirmPassword: undefined})
-                    }
-                  }}
-                  onBlur={() => {
-                    if (password) {
-                      const error = validatePassword(password)
-                      if (error) {
-                        setErrors({...errors, password: error})
-                      }
-                    }
-                  }}
-                  error={errors.password}
-                  hint="Mínimo de 6 caracteres"
-                  required
-                />
+                <div className="form-group">
+                  <label>Telefone</label>
+                  <input
+                    type="tel"
+                    placeholder="(11) 98765-4321"
+                    value={phone}
+                    onChange={(e) => setPhone(formatPhone(e.target.value))}
+                    maxLength={15}
+                  />
+                </div>
 
-                <Input
-                  label="Confirmar senha"
-                  type="password"
-                  placeholder="••••••••"
-                  showPasswordToggle
-                  value={confirmPassword}
-                  onChange={(e) => {
-                    setConfirmPassword(e.target.value)
-                    setErrors({...errors, confirmPassword: undefined})
-                  }}
-                  onBlur={() => {
-                    if (confirmPassword && password !== confirmPassword) {
-                      setErrors({...errors, confirmPassword: 'As senhas não coincidem'})
-                    }
-                  }}
-                  error={errors.confirmPassword}
-                  required
-                />
+                <div className="form-group">
+                  <label>Senha *</label>
+                  <div className="password-input">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="toggle-password"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? '👁️' : '👁️‍🗨️'}
+                    </button>
+                  </div>
+                  <span className="hint">Mínimo de 6 caracteres</span>
+                </div>
+
+                <div className="form-group">
+                  <label>Confirmar senha *</label>
+                  <div className="password-input">
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="toggle-password"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    >
+                      {showConfirmPassword ? '👁️' : '👁️‍🗨️'}
+                    </button>
+                  </div>
+                </div>
 
                 <div className="terms-container">
                   <input 
                     type="checkbox" 
                     id="terms"
                     checked={acceptTerms}
-                    onChange={(e) => {
-                      setAcceptTerms(e.target.checked)
-                      setErrors({...errors, terms: undefined})
-                    }}
+                    onChange={(e) => setAcceptTerms(e.target.checked)}
                   />
                   <label htmlFor="terms" className="terms-label">
                     Concordo com os{' '}
@@ -331,20 +267,28 @@ export default function SignupPage() {
                     </Link>
                   </label>
                 </div>
-                {errors.terms && (
-                  <span className="terms-error">{errors.terms}</span>
+
+                {/* Mensagem */}
+                {message && (
+                  <div className={`message ${message.type}`}>
+                    {message.type === 'success' ? '✓' : '⚠'} {message.text}
+                  </div>
                 )}
 
-                <Button 
+                <button
                   type="submit"
-                  variant="primary"
-                  size="lg"
-                  fullWidth
-                  loading={loading}
+                  className="btn-submit"
                   disabled={loading}
                 >
-                  Criar minha conta
-                </Button>
+                  {loading ? (
+                    <>
+                      <div className="btn-spinner"></div>
+                      Criando conta...
+                    </>
+                  ) : (
+                    'Criar minha conta'
+                  )}
+                </button>
               </form>
 
               <div className="divider">
@@ -355,25 +299,23 @@ export default function SignupPage() {
 
               <div className="login-section">
                 <p className="login-text">Já tem uma conta?</p>
-                <Link href="/login">
-                  <Button variant="outline" size="lg" fullWidth>
-                    Fazer login
-                  </Button>
+                <Link href="/login" className="btn-login">
+                  Fazer login
                 </Link>
               </div>
-            </Card>
+            </div>
           </div>
         </div>
       </div>
 
       <style jsx>{`
         .signup-page {
-          min-height: calc(100vh - 72px);
+          min-height: 100vh;
           display: flex;
-          background: var(--gradient-bg);
+          background: linear-gradient(135deg, #f4f2fa 0%, #e8e4f7 50%, #ddd8f0 100%);
           position: relative;
           overflow: hidden;
-          padding: var(--spacing-2xl) var(--spacing-lg);
+          padding: 80px 24px 40px;
         }
 
         /* Decorações de fundo */
@@ -412,7 +354,7 @@ export default function SignupPage() {
           margin: 0 auto;
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: var(--spacing-3xl);
+          gap: 60px;
           align-items: center;
           position: relative;
           z-index: 1;
@@ -420,7 +362,7 @@ export default function SignupPage() {
 
         /* Lado esquerdo - Branding */
         .branding-side {
-          padding: var(--spacing-xl);
+          padding: 32px;
           animation: slideInLeft 0.8s ease;
         }
 
@@ -443,13 +385,13 @@ export default function SignupPage() {
         .logo {
           font-size: 32px;
           font-weight: 900;
-          background: var(--gradient-primary);
+          background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
-          margin-bottom: var(--spacing-xl);
+          margin-bottom: 32px;
           display: inline-block;
-          transition: transform var(--transition-base);
+          transition: transform 0.3s ease;
         }
 
         .logo:hover {
@@ -459,14 +401,14 @@ export default function SignupPage() {
         .branding-title {
           font-size: 42px;
           font-weight: 900;
-          color: var(--dark);
-          margin-bottom: var(--spacing-lg);
+          color: #2d1f3e;
+          margin-bottom: 20px;
           line-height: 1.2;
           letter-spacing: -1px;
         }
 
         .gradient-text {
-          background: var(--gradient-primary);
+          background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
@@ -474,21 +416,21 @@ export default function SignupPage() {
 
         .branding-subtitle {
           font-size: 18px;
-          color: var(--gray);
+          color: #6b5d7a;
           line-height: 1.6;
-          margin-bottom: var(--spacing-2xl);
+          margin-bottom: 40px;
         }
 
         .features {
           display: flex;
           flex-direction: column;
-          gap: var(--spacing-lg);
+          gap: 24px;
         }
 
         .feature {
           display: flex;
           align-items: center;
-          gap: var(--spacing-md);
+          gap: 16px;
           opacity: 0;
           animation: fadeInUp 0.6s ease forwards;
         }
@@ -511,8 +453,8 @@ export default function SignupPage() {
         .feature-icon {
           width: 40px;
           height: 40px;
-          background: var(--gradient-primary);
-          border-radius: var(--radius-md);
+          background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
+          border-radius: 10px;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -521,13 +463,13 @@ export default function SignupPage() {
         }
 
         .feature-text {
-          color: var(--gray);
+          color: #6b5d7a;
           font-size: 15px;
         }
 
         /* Lado direito - Formulário */
         .form-side {
-          padding: var(--spacing-xl);
+          padding: 32px;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -548,6 +490,10 @@ export default function SignupPage() {
         .signup-card {
           width: 100%;
           max-width: 480px;
+          background: white;
+          border-radius: 20px;
+          padding: 40px;
+          box-shadow: 0 8px 32px rgba(124, 101, 181, 0.12);
           position: relative;
         }
 
@@ -558,46 +504,107 @@ export default function SignupPage() {
           left: 0;
           right: 0;
           height: 4px;
-          background: var(--gradient-primary);
-          border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+          background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
+          border-radius: 20px 20px 0 0;
         }
 
         .form-header {
           text-align: center;
-          margin-bottom: var(--spacing-xl);
+          margin-bottom: 32px;
         }
 
         .form-title {
           font-size: 28px;
           font-weight: 800;
-          color: var(--dark);
-          margin-bottom: var(--spacing-sm);
+          color: #2d1f3e;
+          margin-bottom: 8px;
         }
 
         .form-subtitle {
-          color: var(--gray);
+          color: #6b5d7a;
           font-size: 14px;
         }
 
-        /* Termos e condições */
+        .form-group {
+          margin-bottom: 20px;
+        }
+
+        .form-group label {
+          display: block;
+          font-size: 14px;
+          font-weight: 600;
+          color: #2d1f3e;
+          margin-bottom: 8px;
+        }
+
+        .form-group input {
+          width: 100%;
+          padding: 12px 16px;
+          border-radius: 10px;
+          border: 2px solid rgba(124, 101, 181, 0.15);
+          font-size: 15px;
+          font-family: inherit;
+          transition: all 0.3s ease;
+        }
+
+        .form-group input:focus {
+          outline: none;
+          border-color: #7c65b5;
+          box-shadow: 0 0 0 4px rgba(124, 101, 181, 0.1);
+        }
+
+        .password-input {
+          position: relative;
+        }
+
+        .password-input input {
+          padding-right: 48px;
+        }
+
+        .toggle-password {
+          position: absolute;
+          right: 12px;
+          top: 50%;
+          transform: translateY(-50%);
+          background: none;
+          border: none;
+          cursor: pointer;
+          font-size: 18px;
+          padding: 4px;
+          opacity: 0.6;
+          transition: opacity 0.2s ease;
+        }
+
+        .toggle-password:hover {
+          opacity: 1;
+        }
+
+        .hint {
+          display: block;
+          font-size: 12px;
+          color: #9b8fab;
+          margin-top: 6px;
+        }
+
+        /* Termos */
         .terms-container {
           display: flex;
           align-items: flex-start;
-          gap: var(--spacing-sm);
-          margin-bottom: var(--spacing-lg);
+          gap: 10px;
+          margin-bottom: 24px;
         }
 
         .terms-container input[type="checkbox"] {
           width: 18px;
           height: 18px;
-          accent-color: var(--primary);
+          accent-color: #7c65b5;
           cursor: pointer;
           margin-top: 2px;
           flex-shrink: 0;
         }
 
         .terms-label {
-          color: var(--gray);
+          color: #6b5d7a;
           font-size: 14px;
           line-height: 1.5;
           cursor: pointer;
@@ -605,41 +612,106 @@ export default function SignupPage() {
         }
 
         .terms-link {
-          color: var(--primary);
+          color: #7c65b5;
           text-decoration: none;
           font-weight: 600;
-          transition: color var(--transition-base);
+          transition: color 0.2s ease;
         }
 
         .terms-link:hover {
-          color: var(--primary-dark);
+          color: #5b4a8a;
           text-decoration: underline;
         }
 
-        .terms-error {
-          display: block;
-          color: var(--error);
-          font-size: 12px;
-          margin-top: -12px;
-          margin-bottom: var(--spacing-md);
+        .message {
+          padding: 16px 20px;
+          border-radius: 10px;
+          font-size: 14px;
+          font-weight: 600;
+          margin-bottom: 20px;
+          animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .message.success {
+          background: rgba(34, 197, 94, 0.1);
+          color: #16a34a;
+          border: 1px solid rgba(34, 197, 94, 0.2);
+        }
+
+        .message.error {
+          background: rgba(239, 68, 68, 0.1);
+          color: #dc2626;
+          border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+
+        .btn-submit {
+          width: 100%;
+          padding: 16px;
+          border-radius: 12px;
+          border: none;
+          background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
+          color: white;
+          font-size: 16px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          box-shadow: 0 4px 15px rgba(124, 101, 181, 0.25);
+        }
+
+        .btn-submit:hover:not(:disabled) {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 25px rgba(124, 101, 181, 0.4);
+        }
+
+        .btn-submit:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .btn-spinner {
+          width: 16px;
+          height: 16px;
+          border: 2px solid rgba(255, 255, 255, 0.3);
+          border-top-color: white;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+          to { transform: rotate(360deg); }
         }
 
         /* Divisor */
         .divider {
           display: flex;
           align-items: center;
-          gap: var(--spacing-md);
-          margin: var(--spacing-lg) 0;
+          gap: 16px;
+          margin: 24px 0;
         }
 
         .divider-line {
           flex: 1;
           height: 1px;
-          background: var(--border);
+          background: rgba(124, 101, 181, 0.15);
         }
 
         .divider-text {
-          color: var(--gray-light);
+          color: #9b8fab;
           font-size: 13px;
           text-transform: uppercase;
           letter-spacing: 0.5px;
@@ -650,22 +722,42 @@ export default function SignupPage() {
         }
 
         .login-text {
-          color: var(--gray);
+          color: #6b5d7a;
           font-size: 14px;
-          margin-bottom: var(--spacing-md);
+          margin-bottom: 16px;
+        }
+
+        .btn-login {
+          display: block;
+          width: 100%;
+          padding: 14px;
+          border-radius: 12px;
+          border: 2px solid rgba(124, 101, 181, 0.2);
+          background: white;
+          color: #7c65b5;
+          font-size: 15px;
+          font-weight: 600;
+          text-decoration: none;
+          text-align: center;
+          transition: all 0.3s ease;
+        }
+
+        .btn-login:hover {
+          border-color: #7c65b5;
+          background: rgba(124, 101, 181, 0.05);
         }
 
         /* Responsivo */
         @media (max-width: 968px) {
           .signup-container {
             grid-template-columns: 1fr;
-            gap: var(--spacing-2xl);
+            gap: 40px;
             max-width: 600px;
           }
 
           .branding-side {
             text-align: center;
-            padding: var(--spacing-lg);
+            padding: 20px;
           }
 
           .branding-title {
@@ -678,13 +770,13 @@ export default function SignupPage() {
           }
 
           .form-side {
-            padding: var(--spacing-lg);
+            padding: 0;
           }
         }
 
         @media (max-width: 640px) {
           .signup-page {
-            padding: var(--spacing-lg) var(--spacing-md);
+            padding: 100px 16px 40px;
           }
 
           .branding-title {
@@ -699,12 +791,8 @@ export default function SignupPage() {
             font-size: 28px;
           }
 
-          .branding-side {
-            padding: var(--spacing-md);
-          }
-
-          .form-side {
-            padding: 0;
+          .signup-card {
+            padding: 32px 24px;
           }
         }
       `}</style>

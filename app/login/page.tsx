@@ -74,9 +74,9 @@ export default function LoginPage() {
         return
       }
 
-      // Login bem-sucedido
+      // Login bem-sucedido - REDIRECIONA PARA O DASHBOARD
       showToast('Login realizado com sucesso!', 'success')
-      router.push('/')
+      router.push('/dashboard')
     } catch (err) {
       showToast('Ocorreu um erro ao fazer login. Tente novamente.', 'error')
       setLoading(false)
