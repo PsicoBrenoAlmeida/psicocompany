@@ -1,4 +1,4 @@
-// app/signup/page.tsx
+// app/signup/page.tsx - ATUALIZADO COM GOOGLE OAUTH
 'use client'
 
 import { useState } from 'react'
@@ -11,6 +11,7 @@ export default function SignupPage() {
   const router = useRouter()
 
   const [loading, setLoading] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
 
   // Dados do paciente
@@ -23,6 +24,37 @@ export default function SignupPage() {
 
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
+  // Cadastro com Google
+  const handleGoogleSignup = async () => {
+    try {
+      setGoogleLoading(true)
+      setMessage(null)
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+          scopes: 'https://www.googleapis.com/auth/calendar.events'
+        }
+      })
+
+      if (error) throw error
+
+      // O redirecionamento acontece automaticamente
+    } catch (error: any) {
+      console.error('Erro ao fazer cadastro com Google:', error)
+      setMessage({ 
+        type: 'error', 
+        text: error.message || 'Erro ao cadastrar com Google' 
+      })
+      setGoogleLoading(false)
+    }
+  }
 
   const formatPhone = (value: string) => {
     const numbers = value.replace(/\D/g, '')
@@ -176,6 +208,28 @@ export default function SignupPage() {
                 <p className="form-subtitle">Preencha seus dados para começar</p>
               </div>
 
+              {/* Botão Google - Destaque */}
+              <button
+                type="button"
+                onClick={handleGoogleSignup}
+                disabled={googleLoading || loading}
+                className="google-button"
+              >
+                <svg className="google-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <path d="M19.6 10.227c0-.709-.064-1.39-.182-2.045H10v3.868h5.382a4.6 4.6 0 01-1.996 3.018v2.51h3.232c1.891-1.742 2.982-4.305 2.982-7.35z" fill="#4285F4"/>
+                  <path d="M10 20c2.7 0 4.964-.895 6.618-2.423l-3.232-2.509c-.895.6-2.04.955-3.386.955-2.605 0-4.81-1.76-5.595-4.123H1.064v2.59A9.996 9.996 0 0010 20z" fill="#34A853"/>
+                  <path d="M4.405 11.9c-.2-.6-.314-1.24-.314-1.9 0-.66.114-1.3.314-1.9V5.51H1.064A9.996 9.996 0 000 10c0 1.614.386 3.14 1.064 4.49l3.34-2.59z" fill="#FBBC05"/>
+                  <path d="M10 3.977c1.468 0 2.786.505 3.823 1.496l2.868-2.868C14.959.99 12.695 0 10 0 6.09 0 2.71 2.24 1.064 5.51l3.34 2.59C5.19 5.736 7.395 3.977 10 3.977z" fill="#EA4335"/>
+                </svg>
+                {googleLoading ? 'Conectando...' : 'Continuar com Google'}
+              </button>
+
+              <div className="divider">
+                <div className="divider-line"></div>
+                <span className="divider-text">ou</span>
+                <div className="divider-line"></div>
+              </div>
+
               <form onSubmit={(e) => { e.preventDefault(); handleSignup(); }}>
                 <div className="form-group">
                   <label>Nome completo *</label>
@@ -185,6 +239,7 @@ export default function SignupPage() {
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     autoFocus
+                    disabled={googleLoading}
                   />
                 </div>
 
@@ -195,6 +250,7 @@ export default function SignupPage() {
                     placeholder="seu@email.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    disabled={googleLoading}
                   />
                   <span className="hint">Usaremos para login e comunicações importantes</span>
                 </div>
@@ -207,6 +263,7 @@ export default function SignupPage() {
                     value={phone}
                     onChange={(e) => setPhone(formatPhone(e.target.value))}
                     maxLength={15}
+                    disabled={googleLoading}
                   />
                 </div>
 
@@ -218,11 +275,13 @@ export default function SignupPage() {
                       placeholder="••••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
+                      disabled={googleLoading}
                     />
                     <button
                       type="button"
                       className="toggle-password"
                       onClick={() => setShowPassword(!showPassword)}
+                      disabled={googleLoading}
                     >
                       {showPassword ? '👁️' : '👁️‍🗨️'}
                     </button>
@@ -238,11 +297,13 @@ export default function SignupPage() {
                       placeholder="••••••••"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
+                      disabled={googleLoading}
                     />
                     <button
                       type="button"
                       className="toggle-password"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      disabled={googleLoading}
                     >
                       {showConfirmPassword ? '👁️' : '👁️‍🗨️'}
                     </button>
@@ -255,6 +316,7 @@ export default function SignupPage() {
                     id="terms"
                     checked={acceptTerms}
                     onChange={(e) => setAcceptTerms(e.target.checked)}
+                    disabled={googleLoading}
                   />
                   <label htmlFor="terms" className="terms-label">
                     Concordo com os{' '}
@@ -278,7 +340,7 @@ export default function SignupPage() {
                 <button
                   type="submit"
                   className="btn-submit"
-                  disabled={loading}
+                  disabled={loading || googleLoading}
                 >
                   {loading ? (
                     <>
@@ -290,12 +352,6 @@ export default function SignupPage() {
                   )}
                 </button>
               </form>
-
-              <div className="divider">
-                <div className="divider-line"></div>
-                <span className="divider-text">ou</span>
-                <div className="divider-line"></div>
-              </div>
 
               <div className="login-section">
                 <p className="login-text">Já tem uma conta?</p>
@@ -525,6 +581,45 @@ export default function SignupPage() {
           font-size: 14px;
         }
 
+        /* Botão Google */
+        .google-button {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 12px;
+          padding: 14px 24px;
+          background: white;
+          border: 2px solid #e5e7eb;
+          border-radius: 12px;
+          font-size: 15px;
+          font-weight: 600;
+          color: #1f2937;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          margin-bottom: 24px;
+        }
+
+        .google-button:hover:not(:disabled) {
+          border-color: #d1d5db;
+          background: #f9fafb;
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .google-button:active:not(:disabled) {
+          transform: translateY(0);
+        }
+
+        .google-button:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .google-icon {
+          flex-shrink: 0;
+        }
+
         .form-group {
           margin-bottom: 20px;
         }
@@ -553,6 +648,11 @@ export default function SignupPage() {
           box-shadow: 0 0 0 4px rgba(124, 101, 181, 0.1);
         }
 
+        .form-group input:disabled {
+          background: #f5f5f5;
+          cursor: not-allowed;
+        }
+
         .password-input {
           position: relative;
         }
@@ -575,8 +675,12 @@ export default function SignupPage() {
           transition: opacity 0.2s ease;
         }
 
-        .toggle-password:hover {
+        .toggle-password:hover:not(:disabled) {
           opacity: 1;
+        }
+
+        .toggle-password:disabled {
+          cursor: not-allowed;
         }
 
         .hint {
@@ -601,6 +705,10 @@ export default function SignupPage() {
           cursor: pointer;
           margin-top: 2px;
           flex-shrink: 0;
+        }
+
+        .terms-container input[type="checkbox"]:disabled {
+          cursor: not-allowed;
         }
 
         .terms-label {
@@ -719,6 +827,9 @@ export default function SignupPage() {
 
         .login-section {
           text-align: center;
+          margin-top: 24px;
+          padding-top: 24px;
+          border-top: 1px solid rgba(124, 101, 181, 0.1);
         }
 
         .login-text {

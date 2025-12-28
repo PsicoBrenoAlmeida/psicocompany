@@ -1,1066 +1,1365 @@
-// app/page.tsx
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/utils/supabaseClient'
 
-interface Psychologist {
-  id: string
-  user_id: string
-  crp: string
-  specialties: string[]
-  approach: string | null
-  price_per_session: number
-  rating: number
-  total_reviews: number
-  bio: string | null
-  profile: {
-    full_name: string
-    avatar_url: string | null
-  }
-}
-
-interface Filters {
-  search: string
-  reason: string
-  gender: string
-  priceRange: [number, number]
-  approach: string
-}
-
 export default function HomePage() {
+  const router = useRouter()
   const supabase = createClient()
-  const [psychologists, setPsychologists] = useState<Psychologist[]>([])
-  const [filteredPsychologists, setFilteredPsychologists] = useState<Psychologist[]>([])
   const [loading, setLoading] = useState(true)
-  const [reasonFilterOpen, setReasonFilterOpen] = useState(false)
-  const [advancedFilterOpen, setAdvancedFilterOpen] = useState(false)
-  const [sortBy, setSortBy] = useState('relevant')
-  
-  const [filters, setFilters] = useState<Filters>({
-    search: '',
-    reason: '',
-    gender: '',
-    priceRange: [0, 500],
-    approach: ''
-  })
-
-  const reasons = [
-    'Ansiedade',
-    'Depressão',
-    'Relacionamentos',
-    'Autoestima',
-    'Estresse',
-    'Luto',
-    'TDAH',
-    'Autismo',
-    'Traumas'
-  ]
-
-  const approaches = [
-    'TCC',
-    'Psicanálise',
-    'Humanista',
-    'Gestalt',
-    'ACT',
-    'DBT'
-  ]
 
   useEffect(() => {
-    loadPsychologists()
+    checkUser()
   }, [])
 
-  useEffect(() => {
-    applyFilters()
-  }, [filters, sortBy, psychologists])
-
-  const loadPsychologists = async () => {
+  const checkUser = async () => {
     try {
-      setLoading(true)
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      // Se já estiver logado, redireciona para o dashboard
+      if (user) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('user_type')
+          .eq('user_id', user.id)
+          .single()
 
-      // Buscar todos os psicólogos
-      const { data: psychData, error: psychError } = await supabase
-        .from('psychologists')
-        .select('*')
-        .order('rating', { ascending: false })
-
-      if (psychError) throw psychError
-      if (!psychData || psychData.length === 0) {
-        setPsychologists([])
-        setFilteredPsychologists([])
+        if (profileData?.user_type === 'psychologist') {
+          router.push('/dashboard')
+        } else {
+          // TODO: redirecionar para dashboard de paciente quando existir
+          router.push('/buscar')
+        }
         return
       }
-
-      // Buscar perfis dos psicólogos
-      const psychologistsWithProfiles = await Promise.all(
-        psychData.map(async (psych) => {
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('full_name, avatar_url')
-            .eq('user_id', psych.user_id)
-            .single()
-
-          return {
-            ...psych,
-            profile: {
-              full_name: profileData?.full_name || 'Psicólogo',
-              avatar_url: profileData?.avatar_url || null
-            }
-          }
-        })
-      )
-
-      setPsychologists(psychologistsWithProfiles)
-      setFilteredPsychologists(psychologistsWithProfiles)
     } catch (error) {
-      console.error('Erro ao carregar psicólogos:', error)
+      console.error('Erro ao verificar usuário:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  const applyFilters = () => {
-    let filtered = [...psychologists]
-
-    if (filters.search) {
-      filtered = filtered.filter(p => 
-        p.profile.full_name.toLowerCase().includes(filters.search.toLowerCase()) ||
-        p.specialties?.some(s => s.toLowerCase().includes(filters.search.toLowerCase()))
-      )
-    }
-
-    if (filters.reason) {
-      filtered = filtered.filter(p => 
-        p.specialties?.some(s => s.toLowerCase().includes(filters.reason.toLowerCase()))
-      )
-    }
-
-    filtered = filtered.filter(p => 
-      p.price_per_session >= filters.priceRange[0] && 
-      p.price_per_session <= filters.priceRange[1]
+  if (loading) {
+    return (
+      <>
+        <main className="landing-page">
+          <div className="loading">
+            <div className="spinner"></div>
+          </div>
+        </main>
+        <style jsx>{styles}</style>
+      </>
     )
-
-    if (filters.approach) {
-      filtered = filtered.filter(p => 
-        p.approach?.toLowerCase().includes(filters.approach.toLowerCase())
-      )
-    }
-
-    if (sortBy === 'price_asc') {
-      filtered.sort((a, b) => a.price_per_session - b.price_per_session)
-    } else if (sortBy === 'price_desc') {
-      filtered.sort((a, b) => b.price_per_session - a.price_per_session)
-    } else if (sortBy === 'rating') {
-      filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0))
-    }
-
-    setFilteredPsychologists(filtered)
-  }
-
-  const clearFilters = () => {
-    setFilters({
-      search: '',
-      reason: '',
-      gender: '',
-      priceRange: [0, 500],
-      approach: ''
-    })
-  }
-
-  const getActiveFiltersCount = () => {
-    let count = 0
-    if (filters.reason) count++
-    if (filters.gender) count++
-    if (filters.approach) count++
-    if (filters.priceRange[0] > 0 || filters.priceRange[1] < 500) count++
-    return count
-  }
-
-  const getInitials = (name: string) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
   }
 
   return (
     <>
-      <section className="hero">
-        <div className="hero-container">
-          <h1 className="hero-title">
-            Encontre o psicólogo ideal para você
-          </h1>
-          <p className="hero-subtitle">
-            Profissionais qualificados especializados em TCC, neurociência e bem-estar emocional
-          </p>
-
-          <div className="search-bar">
-            <div className="search-input-wrapper">
-              <svg className="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="11" cy="11" r="8"></circle>
-                <path d="m21 21-4.35-4.35"></path>
-              </svg>
-              <input
-                type="text"
-                placeholder="Busque por nome ou especialidade..."
-                className="search-input"
-                value={filters.search}
-                onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-              />
-            </div>
-
-            <button 
-              className={`filter-button ${filters.reason ? 'active' : ''}`}
-              onClick={() => setReasonFilterOpen(!reasonFilterOpen)}
-            >
-              <span>Motivo</span>
-              {filters.reason && <span className="filter-badge">1</span>}
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
-            </button>
-
-            <button 
-              className={`filter-button ${getActiveFiltersCount() > 0 ? 'active' : ''}`}
-              onClick={() => setAdvancedFilterOpen(!advancedFilterOpen)}
-            >
-              <span>Mais Filtros</span>
-              {getActiveFiltersCount() > 0 && (
-                <span className="filter-badge">{getActiveFiltersCount()}</span>
-              )}
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-              </svg>
-            </button>
-          </div>
-
-          {reasonFilterOpen && (
-            <div className="filter-modal-overlay" onClick={() => setReasonFilterOpen(false)}>
-              <div className="filter-modal" onClick={(e) => e.stopPropagation()}>
-                <div className="filter-modal-header">
-                  <h3>Motivo da Terapia</h3>
-                  <button onClick={() => setReasonFilterOpen(false)}>✕</button>
-                </div>
-                <div className="filter-modal-content">
-                  <div className="filter-options-grid">
-                    {reasons.map(reason => (
-                      <button
-                        key={reason}
-                        className={`filter-option ${filters.reason === reason ? 'selected' : ''}`}
-                        onClick={() => {
-                          setFilters({ ...filters, reason: filters.reason === reason ? '' : reason })
-                          setReasonFilterOpen(false)
-                        }}
-                      >
-                        {reason}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+      <main className="landing-page">
+        
+        {/* Hero Section */}
+        <section className="hero">
+          <div className="hero-bg-decoration"></div>
+          <div className="hero-container">
+            <div className="hero-content">
+              <div className="hero-badge">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
+                </svg>
+                Sua saúde mental em primeiro lugar
               </div>
-            </div>
-          )}
+              
+              <h1 className="hero-title">
+                Encontre o psicólogo <span className="gradient-text">perfeito para você</span>
+              </h1>
+              
+              <p className="hero-subtitle">
+                Conectamos você com profissionais qualificados especializados em diversas áreas da psicologia. 
+                Terapia online ou presencial, no seu tempo e do seu jeito.
+              </p>
 
-          {advancedFilterOpen && (
-            <div className="filter-modal-overlay" onClick={() => setAdvancedFilterOpen(false)}>
-              <div className="filter-modal advanced" onClick={(e) => e.stopPropagation()}>
-                <div className="filter-modal-header">
-                  <h3>Filtros Avançados</h3>
-                  <button onClick={() => setAdvancedFilterOpen(false)}>✕</button>
-                </div>
-                <div className="filter-modal-content">
-                  
-                  <div className="filter-group">
-                    <label>Preço por Sessão</label>
-                    <div className="price-range">
-                      <span>R$ {filters.priceRange[0]}</span>
-                      <input
-                        type="range"
-                        min="0"
-                        max="500"
-                        value={filters.priceRange[1]}
-                        onChange={(e) => setFilters({ 
-                          ...filters, 
-                          priceRange: [filters.priceRange[0], parseInt(e.target.value)] 
-                        })}
-                      />
-                      <span>R$ {filters.priceRange[1]}</span>
-                    </div>
-                  </div>
-
-                  <div className="filter-group">
-                    <label>Abordagem Terapêutica</label>
-                    <div className="filter-options-grid">
-                      {approaches.map(approach => (
-                        <button
-                          key={approach}
-                          className={`filter-option ${filters.approach === approach ? 'selected' : ''}`}
-                          onClick={() => setFilters({ ...filters, approach: filters.approach === approach ? '' : approach })}
-                        >
-                          {approach}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="filter-modal-footer">
-                    <button className="btn-clear" onClick={clearFilters}>
-                      Limpar Filtros
-                    </button>
-                    <button className="btn-apply" onClick={() => setAdvancedFilterOpen(false)}>
-                      Aplicar Filtros
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section className="results">
-        <div className="results-container">
-          
-          {loading ? (
-            <div className="loading">
-              <div className="spinner"></div>
-              <p>Carregando psicólogos...</p>
-            </div>
-          ) : (
-            <>
-              <div className="results-header">
-                <div className="results-count">
-                  <strong>{filteredPsychologists.length}</strong> {filteredPsychologists.length === 1 ? 'psicólogo encontrado' : 'psicólogos encontrados'}
-                </div>
-                
-                <div className="results-sort">
-                  <label>Ordenar por:</label>
-                  <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-                    <option value="relevant">Mais Relevantes</option>
-                    <option value="price_asc">Menor Preço</option>
-                    <option value="price_desc">Maior Preço</option>
-                    <option value="rating">Melhor Avaliação</option>
-                  </select>
-                </div>
-              </div>
-
-              {filteredPsychologists.length === 0 ? (
-                <div className="no-results">
-                  <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <div className="hero-cta">
+                <Link href="/buscar" className="btn-primary">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <circle cx="11" cy="11" r="8"></circle>
                     <path d="m21 21-4.35-4.35"></path>
                   </svg>
-                  <h3>Nenhum psicólogo encontrado</h3>
-                  <p>Tente ajustar os filtros de busca ou aguarde novos cadastros</p>
-                  {(filters.search || filters.reason || filters.approach || filters.priceRange[1] < 500) && (
-                    <button className="btn-clear-filters" onClick={clearFilters}>
-                      Limpar Filtros
-                    </button>
-                  )}
+                  Buscar Psicólogo
+                </Link>
+                
+                <Link href="#como-funciona" className="btn-secondary">
+                  Como Funciona
+                </Link>
+              </div>
+
+              <div className="hero-stats">
+                <div className="stat-item">
+                  <strong>✓</strong>
+                  <span>Profissionais Verificados</span>
                 </div>
-              ) : (
-                <div className="psychologists-grid">
-                  {filteredPsychologists.map(psychologist => (
-                    <div key={psychologist.id} className="psychologist-card">
-                      <div className="card-image">
-                        {psychologist.profile.avatar_url ? (
-                          <img src={psychologist.profile.avatar_url} alt={psychologist.profile.full_name} />
-                        ) : (
-                          <div className="card-image-placeholder">
-                            {getInitials(psychologist.profile.full_name)}
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div className="card-content">
-                        <h3 className="card-name">{psychologist.profile.full_name}</h3>
-                        <p className="card-crp">CRP {psychologist.crp}</p>
-                        
-                        {psychologist.specialties && psychologist.specialties.length > 0 && (
-                          <div className="card-specialties">
-                            {psychologist.specialties.slice(0, 3).map((specialty, idx) => (
-                              <span key={idx} className="specialty-tag">{specialty}</span>
-                            ))}
-                            {psychologist.specialties.length > 3 && (
-                              <span className="specialty-tag more">+{psychologist.specialties.length - 3}</span>
-                            )}
-                          </div>
-                        )}
+                <div className="stat-divider"></div>
+                <div className="stat-item">
+                  <strong>✓</strong>
+                  <span>Diversas Especialidades</span>
+                </div>
+                <div className="stat-divider"></div>
+                <div className="stat-item">
+                  <strong>✓</strong>
+                  <span>Online ou Presencial</span>
+                </div>
+              </div>
+            </div>
 
-                        {psychologist.approach && (
-                          <p className="card-approach">Abordagem: {psychologist.approach}</p>
-                        )}
-                        
-                        {psychologist.bio && (
-                          <p className="card-bio">{psychologist.bio.slice(0, 100)}...</p>
-                        )}
+            <div className="hero-image">
+              <div className="hero-image-card">
+                <div className="floating-card card-1">
+                  <div className="card-icon">💚</div>
+                  <div className="card-text">
+                    <strong>Ansiedade</strong>
+                    <span>Especialistas disponíveis</span>
+                  </div>
+                </div>
+                
+                <div className="floating-card card-2">
+                  <div className="card-icon">🧠</div>
+                  <div className="card-text">
+                    <strong>TCC</strong>
+                    <span>Abordagem comprovada</span>
+                  </div>
+                </div>
+                
+                <div className="floating-card card-3">
+                  <div className="card-icon">⭐</div>
+                  <div className="card-text">
+                    <strong>Qualidade</strong>
+                    <span>Profissionais qualificados</span>
+                  </div>
+                </div>
 
-                        {psychologist.rating > 0 && (
-                          <div className="card-rating">
-                            ⭐ {psychologist.rating.toFixed(1)} ({psychologist.total_reviews} {psychologist.total_reviews === 1 ? 'avaliação' : 'avaliações'})
-                          </div>
-                        )}
-                        
-                        <div className="card-footer">
-                          <div className="card-price">
-                            <span className="price-label">A partir de</span>
-                            <span className="price-value">R$ {psychologist.price_per_session.toFixed(2)}</span>
-                          </div>
-                          
-                          <Link href={`/psicologo/${psychologist.id}`} className="btn-schedule">
-                            Ver Perfil
-                          </Link>
-                        </div>
-                      </div>
+                <div className="hero-image-main">
+                  <svg width="100%" height="100%" viewBox="0 0 400 400" fill="none">
+                    <circle cx="200" cy="200" r="180" fill="url(#grad1)" opacity="0.2"/>
+                    <circle cx="200" cy="200" r="140" fill="url(#grad2)" opacity="0.3"/>
+                    <circle cx="200" cy="200" r="100" fill="url(#grad3)"/>
+                    <defs>
+                      <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#7c65b5"/>
+                        <stop offset="100%" stopColor="#a996dd"/>
+                      </linearGradient>
+                      <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#a996dd"/>
+                        <stop offset="100%" stopColor="#7c65b5"/>
+                      </linearGradient>
+                      <linearGradient id="grad3" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#7c65b5"/>
+                        <stop offset="100%" stopColor="#a996dd"/>
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                  <div className="hero-image-emoji">🧘‍♀️</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Como Funciona */}
+        <section className="how-it-works" id="como-funciona">
+          <div className="section-container">
+            <div className="section-header">
+              <h2 className="section-title">Como funciona?</h2>
+              <p className="section-subtitle">
+                Em apenas 3 passos simples, você encontra o profissional ideal e agenda sua primeira sessão
+              </p>
+            </div>
+
+            <div className="steps-grid">
+              <div className="step-card">
+                <div className="step-number">1</div>
+                <div className="step-icon">🔍</div>
+                <h3>Busque seu psicólogo</h3>
+                <p>
+                  Use nossos filtros para encontrar profissionais especializados na sua necessidade. 
+                  Filtre por especialidade, abordagem, preço e muito mais.
+                </p>
+              </div>
+
+              <div className="step-card">
+                <div className="step-number">2</div>
+                <div className="step-icon">📅</div>
+                <h3>Agende sua consulta</h3>
+                <p>
+                  Escolha o melhor horário na agenda do profissional e agende sua sessão de forma rápida e prática, 
+                  online ou presencial.
+                </p>
+              </div>
+
+              <div className="step-card">
+                <div className="step-number">3</div>
+                <div className="step-icon">💬</div>
+                <h3>Comece sua jornada</h3>
+                <p>
+                  Realize sua sessão com total privacidade e segurança. Acesse o histórico, 
+                  acompanhe sua evolução e reagende quando precisar.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Áreas de Especialização */}
+        <section className="specialties">
+          <div className="section-container">
+            <div className="section-header">
+              <h2 className="section-title">Áreas de Especialização</h2>
+              <p className="section-subtitle">
+                Encontre profissionais especializados em diversas áreas da psicologia
+              </p>
+            </div>
+
+            <div className="specialties-grid">
+              {[
+                { icon: '😰', name: 'Ansiedade e Pânico' },
+                { icon: '😔', name: 'Depressão' },
+                { icon: '💼', name: 'Burnout e Estresse' },
+                { icon: '💑', name: 'Relacionamentos' },
+                { icon: '👨‍👩‍👧', name: 'Terapia Familiar' },
+                { icon: '🎯', name: 'Autoestima' },
+                { icon: '🧠', name: 'TDAH e TEA' },
+                { icon: '💔', name: 'Luto e Perdas' }
+              ].map((specialty, idx) => (
+                <Link 
+                  key={idx} 
+                  href={`/buscar?specialty=${encodeURIComponent(specialty.name)}`}
+                  className="specialty-card"
+                >
+                  <div className="specialty-icon">{specialty.icon}</div>
+                  <h3>{specialty.name}</h3>
+                  <span className="specialty-count">Profissionais disponíveis</span>
+                </Link>
+              ))}
+            </div>
+
+            <div className="specialties-cta">
+              <Link href="/buscar" className="btn-outline">
+                Ver todas as especialidades
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                  <polyline points="12 5 19 12 12 19"></polyline>
+                </svg>
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        {/* Benefícios */}
+        <section className="benefits">
+          <div className="section-container">
+            <div className="benefits-grid">
+              <div className="benefits-content">
+                <h2 className="section-title">Por que escolher a Psicocompany?</h2>
+                <p className="benefits-intro">
+                  Nossa plataforma foi criada pensando em conectar pessoas que precisam de suporte 
+                  emocional com os melhores profissionais da área.
+                </p>
+
+                <div className="benefits-list">
+                  <div className="benefit-item">
+                    <div className="benefit-icon">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                      </svg>
                     </div>
-                  ))}
+                    <div className="benefit-text">
+                      <h3>Profissionais Verificados</h3>
+                      <p>Todos os psicólogos são checados e validados pelo CRP</p>
+                    </div>
+                  </div>
+
+                  <div className="benefit-item">
+                    <div className="benefit-icon">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                      </svg>
+                    </div>
+                    <div className="benefit-text">
+                      <h3>Segurança e Privacidade</h3>
+                      <p>Seus dados e sessões são totalmente confidenciais</p>
+                    </div>
+                  </div>
+
+                  <div className="benefit-item">
+                    <div className="benefit-icon">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                      </svg>
+                    </div>
+                    <div className="benefit-text">
+                      <h3>Flexibilidade Total</h3>
+                      <p>Agende no horário que funciona melhor para você</p>
+                    </div>
+                  </div>
+
+                  <div className="benefit-item">
+                    <div className="benefit-icon">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                      </svg>
+                    </div>
+                    <div className="benefit-text">
+                      <h3>Preços Transparentes</h3>
+                      <p>Veja o valor da sessão antes de agendar</p>
+                    </div>
+                  </div>
                 </div>
-              )}
-            </>
-          )}
-        </div>
-      </section>
-
-      <style jsx>{`
-        .hero {
-          background: linear-gradient(135deg, #f4f2fa 0%, #e8e4f7 50%, #ddd8f0 100%);
-          padding: 120px 24px 60px;
-          position: relative;
-          overflow: hidden;
-        }
-
-        .hero::before {
-          content: '';
-          position: absolute;
-          width: 600px;
-          height: 600px;
-          background: radial-gradient(circle, rgba(124, 101, 181, 0.06) 0%, transparent 70%);
-          top: -300px;
-          right: -100px;
-          animation: float 20s ease-in-out infinite;
-        }
-
-        @keyframes float {
-          0%, 100% { transform: translate(0, 0); }
-          50% { transform: translate(30px, -30px); }
-        }
-
-        .hero-container {
-          max-width: 900px;
-          margin: 0 auto;
-          position: relative;
-          z-index: 2;
-        }
-
-        .hero-title {
-          font-size: 42px;
-          font-weight: 800;
-          color: #2d1f3e;
-          text-align: center;
-          margin-bottom: 12px;
-          line-height: 1.2;
-        }
-
-        .hero-subtitle {
-          font-size: 18px;
-          color: #6b5d7a;
-          text-align: center;
-          margin-bottom: 40px;
-          font-weight: 400;
-        }
-
-        .search-bar {
-          display: flex;
-          gap: 12px;
-          align-items: center;
-          flex-wrap: wrap;
-        }
-
-        .search-input-wrapper {
-          flex: 1;
-          position: relative;
-          min-width: 300px;
-        }
-
-        .search-icon {
-          position: absolute;
-          left: 16px;
-          top: 50%;
-          transform: translateY(-50%);
-          color: #9b8fab;
-        }
-
-        .search-input {
-          width: 100%;
-          padding: 14px 16px 14px 48px;
-          border-radius: 12px;
-          border: 2px solid rgba(124, 101, 181, 0.15);
-          font-size: 15px;
-          background: white;
-          transition: all 0.3s ease;
-        }
-
-        .search-input:focus {
-          outline: none;
-          border-color: #7c65b5;
-          box-shadow: 0 0 0 4px rgba(124, 101, 181, 0.1);
-        }
-
-        .filter-button {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 14px 20px;
-          border-radius: 12px;
-          border: 2px solid rgba(124, 101, 181, 0.15);
-          background: white;
-          font-size: 15px;
-          font-weight: 500;
-          color: #2d1f3e;
-          cursor: pointer;
-          transition: all 0.3s ease;
-          white-space: nowrap;
-        }
-
-        .filter-button:hover {
-          border-color: #7c65b5;
-          background: rgba(124, 101, 181, 0.05);
-        }
-
-        .filter-button.active {
-          border-color: #7c65b5;
-          background: rgba(124, 101, 181, 0.1);
-          color: #7c65b5;
-        }
-
-        .filter-badge {
-          background: #7c65b5;
-          color: white;
-          font-size: 12px;
-          font-weight: 700;
-          padding: 2px 7px;
-          border-radius: 10px;
-          min-width: 20px;
-          text-align: center;
-        }
-
-        .filter-modal-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(0, 0, 0, 0.5);
-          z-index: 9999;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 20px;
-          animation: fadeIn 0.2s ease;
-        }
-
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-
-        .filter-modal {
-          background: white;
-          border-radius: 16px;
-          max-width: 500px;
-          width: 100%;
-          max-height: 80vh;
-          overflow: hidden;
-          display: flex;
-          flex-direction: column;
-          animation: slideUp 0.3s ease;
-        }
-
-        .filter-modal.advanced {
-          max-width: 700px;
-        }
-
-        @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        .filter-modal-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 20px 24px;
-          border-bottom: 1px solid rgba(124, 101, 181, 0.1);
-        }
-
-        .filter-modal-header h3 {
-          font-size: 20px;
-          font-weight: 700;
-          color: #2d1f3e;
-          margin: 0;
-        }
-
-        .filter-modal-header button {
-          width: 32px;
-          height: 32px;
-          border-radius: 8px;
-          border: none;
-          background: rgba(124, 101, 181, 0.08);
-          color: #2d1f3e;
-          font-size: 18px;
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-
-        .filter-modal-header button:hover {
-          background: rgba(124, 101, 181, 0.15);
-        }
-
-        .filter-modal-content {
-          padding: 24px;
-          overflow-y: auto;
-        }
-
-        .filter-group {
-          margin-bottom: 28px;
-        }
-
-        .filter-group:last-child {
-          margin-bottom: 0;
-        }
-
-        .filter-group label {
-          display: block;
-          font-size: 14px;
-          font-weight: 600;
-          color: #2d1f3e;
-          margin-bottom: 12px;
-        }
-
-        .filter-options-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-          gap: 10px;
-        }
-
-        .filter-option {
-          padding: 10px 16px;
-          border-radius: 10px;
-          border: 2px solid rgba(124, 101, 181, 0.15);
-          background: white;
-          font-size: 14px;
-          font-weight: 500;
-          color: #2d1f3e;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          text-align: center;
-        }
-
-        .filter-option:hover {
-          border-color: #7c65b5;
-          background: rgba(124, 101, 181, 0.05);
-        }
-
-        .filter-option.selected {
-          border-color: #7c65b5;
-          background: #7c65b5;
-          color: white;
-        }
-
-        .price-range {
-          display: flex;
-          align-items: center;
-          gap: 16px;
-        }
-
-        .price-range span {
-          font-size: 14px;
-          font-weight: 600;
-          color: #7c65b5;
-          min-width: 60px;
-        }
-
-        .price-range input[type="range"] {
-          flex: 1;
-          height: 6px;
-          border-radius: 3px;
-          background: rgba(124, 101, 181, 0.15);
-          outline: none;
-        }
-
-        .price-range input[type="range"]::-webkit-slider-thumb {
-          appearance: none;
-          width: 20px;
-          height: 20px;
-          border-radius: 50%;
-          background: #7c65b5;
-          cursor: pointer;
-        }
-
-        .filter-modal-footer {
-          display: flex;
-          gap: 12px;
-          padding-top: 20px;
-          border-top: 1px solid rgba(124, 101, 181, 0.1);
-        }
-
-        .btn-clear {
-          flex: 1;
-          padding: 12px;
-          border-radius: 10px;
-          border: 2px solid rgba(124, 101, 181, 0.2);
-          background: white;
-          font-size: 15px;
-          font-weight: 600;
-          color: #6b5d7a;
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-
-        .btn-clear:hover {
-          border-color: #7c65b5;
-          color: #7c65b5;
-        }
-
-        .btn-apply {
-          flex: 1;
-          padding: 12px;
-          border-radius: 10px;
-          border: none;
-          background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
-          font-size: 15px;
-          font-weight: 600;
-          color: white;
-          cursor: pointer;
-          transition: all 0.3s ease;
-        }
-
-        .btn-apply:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 16px rgba(124, 101, 181, 0.3);
-        }
-
-        .results {
-          padding: 60px 24px;
-          background: #faf9fc;
-        }
-
-        .results-container {
-          max-width: 1200px;
-          margin: 0 auto;
-        }
-
-        .loading {
-          text-align: center;
-          padding: 80px 20px;
-        }
-
-        .spinner {
-          width: 48px;
-          height: 48px;
-          border: 4px solid rgba(124, 101, 181, 0.1);
-          border-top-color: #7c65b5;
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-          margin: 0 auto 20px;
-        }
-
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-
-        .loading p {
-          color: #6b5d7a;
-          font-size: 16px;
-        }
-
-        .results-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: 32px;
-          flex-wrap: wrap;
-          gap: 16px;
-        }
-
-        .results-count {
-          font-size: 18px;
-          color: #6b5d7a;
-        }
-
-        .results-count strong {
-          color: #2d1f3e;
-          font-weight: 700;
-        }
-
-        .results-sort {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-
-        .results-sort label {
-          font-size: 14px;
-          color: #6b5d7a;
-          font-weight: 500;
-        }
-
-        .results-sort select {
-          padding: 8px 32px 8px 12px;
-          border-radius: 8px;
-          border: 2px solid rgba(124, 101, 181, 0.15);
-          background: white;
-          font-size: 14px;
-          font-weight: 500;
-          color: #2d1f3e;
-          cursor: pointer;
-          appearance: none;
-          background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%236b5d7a' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
-          background-repeat: no-repeat;
-          background-position: right 12px center;
-        }
-
-        .results-sort select:focus {
-          outline: none;
-          border-color: #7c65b5;
-        }
-
-        .no-results {
-          text-align: center;
-          padding: 80px 20px;
-        }
-
-        .no-results svg {
-          color: #9b8fab;
-          margin-bottom: 20px;
-        }
-
-        .no-results h3 {
-          font-size: 24px;
-          color: #2d1f3e;
-          margin-bottom: 8px;
-        }
-
-        .no-results p {
-          color: #6b5d7a;
-          font-size: 16px;
-          margin-bottom: 24px;
-        }
-
-        .btn-clear-filters {
-          padding: 12px 28px;
-          border-radius: 10px;
-          border: 2px solid #7c65b5;
-          background: white;
-          color: #7c65b5;
-          font-size: 15px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.3s ease;
-        }
-
-        .btn-clear-filters:hover {
-          background: #7c65b5;
-          color: white;
-        }
-
-        .psychologists-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-          gap: 24px;
-        }
-
-        .psychologist-card {
-          background: white;
-          border-radius: 16px;
-          overflow: hidden;
-          box-shadow: 0 4px 16px rgba(124, 101, 181, 0.08);
-          transition: all 0.3s ease;
-          border: 1px solid rgba(124, 101, 181, 0.08);
-        }
-
-        .psychologist-card:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 8px 28px rgba(124, 101, 181, 0.15);
-        }
-
-        .card-image {
-          height: 200px;
-          background: linear-gradient(135deg, #e8e4f7 0%, #ddd8f0 100%);
-          position: relative;
-          overflow: hidden;
-        }
-
-        .card-image img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-
-        .card-image-placeholder {
-          width: 100%;
-          height: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 48px;
-          font-weight: 700;
-          color: #7c65b5;
-        }
-
-        .card-content {
-          padding: 20px;
-        }
-
-        .card-name {
-          font-size: 18px;
-          font-weight: 700;
-          color: #2d1f3e;
-          margin-bottom: 4px;
-        }
-
-        .card-crp {
-          font-size: 13px;
-          color: #9b8fab;
-          margin-bottom: 12px;
-        }
-
-        .card-specialties {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 6px;
-          margin-bottom: 12px;
-        }
-
-        .specialty-tag {
-          padding: 4px 10px;
-          border-radius: 6px;
-          background: rgba(124, 101, 181, 0.1);
-          color: #7c65b5;
-          font-size: 12px;
-          font-weight: 600;
-        }
-
-        .specialty-tag.more {
-          background: rgba(124, 101, 181, 0.2);
-        }
-
-        .card-approach {
-          font-size: 13px;
-          color: #6b5d7a;
-          margin-bottom: 10px;
-          font-weight: 500;
-        }
-
-        .card-bio {
-          font-size: 14px;
-          color: #6b5d7a;
-          line-height: 1.5;
-          margin-bottom: 12px;
-        }
-
-        .card-rating {
-          font-size: 13px;
-          color: #f59e0b;
-          font-weight: 600;
-          margin-bottom: 16px;
-        }
-
-        .card-footer {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding-top: 16px;
-          border-top: 1px solid rgba(124, 101, 181, 0.1);
-        }
-
-        .card-price {
-          display: flex;
-          flex-direction: column;
-        }
-
-        .price-label {
-          font-size: 12px;
-          color: #9b8fab;
-          margin-bottom: 2px;
-        }
-
-        .price-value {
-          font-size: 20px;
-          font-weight: 700;
-          color: #7c65b5;
-        }
-
-        .btn-schedule {
-          padding: 10px 20px;
-          border-radius: 8px;
-          background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
-          color: white;
-          font-size: 14px;
-          font-weight: 600;
-          text-decoration: none;
-          transition: all 0.3s ease;
-        }
-
-        .btn-schedule:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(124, 101, 181, 0.3);
-        }
-
-        @media (max-width: 768px) {
-          .hero {
-            padding: 100px 16px 40px;
-          }
-
-          .hero-title {
-            font-size: 32px;
-          }
-
-          .hero-subtitle {
-            font-size: 16px;
-          }
-
-          .search-bar {
-            flex-direction: column;
-          }
-
-          .search-input-wrapper {
-            width: 100%;
-            min-width: auto;
-          }
-
-          .filter-button {
-            width: 100%;
-            justify-content: center;
-          }
-
-          .results-header {
-            flex-direction: column;
-            align-items: flex-start;
-          }
-
-          .psychologists-grid {
-            grid-template-columns: 1fr;
-          }
-
-          .filter-modal {
-            max-width: 100%;
-            max-height: 90vh;
-          }
-
-          .filter-options-grid {
-            grid-template-columns: 1fr;
-          }
-
-          .filter-modal-footer {
-            flex-direction: column;
-          }
-        }
-      `}</style>
+              </div>
+
+              <div className="benefits-visual">
+                <div className="visual-card">
+                  <div className="visual-example-badge">
+                    ✨ Exemplo de Perfil
+                  </div>
+                  <div className="visual-header">
+                    <div className="visual-avatar">👨‍⚕️</div>
+                    <div className="visual-info">
+                      <strong>Dr. João Silva</strong>
+                      <span>Psicólogo(a) - CRP</span>
+                    </div>
+                  </div>
+                  <div className="visual-tags">
+                    <span className="tag">Especialidades</span>
+                    <span className="tag">Abordagem</span>
+                    <span className="tag">💻 Modalidade</span>
+                  </div>
+                  <div className="visual-rating">
+                    ⭐⭐⭐⭐⭐ <strong>Avaliações</strong>
+                  </div>
+                  <div className="visual-price">
+                    <span>Valor da sessão</span>
+                    <strong>R$ 80</strong>
+                  </div>
+                  <div className="visual-features">
+                    <div className="feature-item">✓ Verificado pelo CRP</div>
+                    <div className="feature-item">✓ Agendamento online</div>
+                    <div className="feature-item">✓ Primeira consulta</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Benefícios da Terapia */}
+        <section className="therapy-benefits">
+          <div className="section-container">
+            <div className="section-header">
+              <h2 className="section-title">Benefícios da Terapia</h2>
+              <p className="section-subtitle">
+                Cuidar da saúde mental traz transformações reais para sua vida
+              </p>
+            </div>
+
+            <div className="therapy-grid">
+              <div className="therapy-card">
+                <div className="therapy-icon">🌟</div>
+                <h3>Autoconhecimento</h3>
+                <p>Compreenda melhor seus pensamentos, emoções e comportamentos</p>
+              </div>
+
+              <div className="therapy-card">
+                <div className="therapy-icon">💪</div>
+                <h3>Resiliência</h3>
+                <p>Desenvolva ferramentas para lidar com desafios e adversidades</p>
+              </div>
+
+              <div className="therapy-card">
+                <div className="therapy-icon">🎯</div>
+                <h3>Clareza</h3>
+                <p>Tome decisões mais conscientes e alinhadas com seus valores</p>
+              </div>
+
+              <div className="therapy-card">
+                <div className="therapy-icon">❤️</div>
+                <h3>Relacionamentos</h3>
+                <p>Melhore a qualidade das suas relações pessoais e profissionais</p>
+              </div>
+
+              <div className="therapy-card">
+                <div className="therapy-icon">😌</div>
+                <h3>Bem-estar</h3>
+                <p>Reduza ansiedade, estresse e outros sintomas emocionais</p>
+              </div>
+
+              <div className="therapy-card">
+                <div className="therapy-icon">🚀</div>
+                <h3>Crescimento</h3>
+                <p>Alcance seu potencial e realize seus objetivos de vida</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* CTA Final */}
+        <section className="final-cta">
+          <div className="section-container">
+            <div className="final-cta-content">
+              <h2>Pronto para cuidar da sua saúde mental?</h2>
+              <p>Dê o primeiro passo hoje. Encontre o profissional ideal para você.</p>
+              <Link href="/buscar" className="btn-cta">
+                Encontrar Psicólogo Agora
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                  <polyline points="12 5 19 12 12 19"></polyline>
+                </svg>
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        {/* Footer para Psicólogos */}
+        <section className="psychologist-cta">
+          <div className="section-container">
+            <div className="psychologist-cta-content">
+              <div className="psychologist-info">
+                <h3>Você é psicólogo?</h3>
+                <p>Junte-se à nossa rede de profissionais e expanda sua prática</p>
+              </div>
+              <Link href="/cadastro-rapido" className="btn-psychologist">
+                Cadastrar como Profissional
+              </Link>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <style jsx>{styles}</style>
     </>
   )
 }
+
+const styles = `
+  .landing-page {
+    min-height: 100vh;
+    background: #fafafa;
+  }
+
+  /* Loading */
+  .loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #f4f2fa 0%, #e8e4f7 50%, #ddd8f0 100%);
+  }
+
+  .spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid rgba(124, 101, 181, 0.1);
+    border-top-color: #7c65b5;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* Hero Section */
+  .hero {
+    background: linear-gradient(135deg, #f4f2fa 0%, #e8e4f7 50%, #ddd8f0 100%);
+    padding: 140px 24px 80px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero-bg-decoration {
+    position: absolute;
+    width: 800px;
+    height: 800px;
+    background: radial-gradient(circle, rgba(124, 101, 181, 0.08) 0%, transparent 70%);
+    top: -400px;
+    right: -200px;
+    animation: float 25s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translate(0, 0) rotate(0deg); }
+    33% { transform: translate(30px, -30px) rotate(120deg); }
+    66% { transform: translate(-20px, 20px) rotate(240deg); }
+  }
+
+  .hero-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 60px;
+    align-items: center;
+    position: relative;
+    z-index: 2;
+  }
+
+  .hero-content {
+    animation: slideInLeft 0.8s ease;
+  }
+
+  @keyframes slideInLeft {
+    from {
+      opacity: 0;
+      transform: translateX(-40px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: rgba(124, 101, 181, 0.1);
+    border: 2px solid rgba(124, 101, 181, 0.2);
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #7c65b5;
+    margin-bottom: 24px;
+  }
+
+  .hero-badge svg {
+    color: #f59e0b;
+  }
+
+  .hero-title {
+    font-size: 56px;
+    font-weight: 900;
+    color: #2d1f3e;
+    line-height: 1.1;
+    margin-bottom: 20px;
+    letter-spacing: -2px;
+  }
+
+  .gradient-text {
+    background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero-subtitle {
+    font-size: 18px;
+    line-height: 1.7;
+    color: #6b5d7a;
+    margin-bottom: 32px;
+    max-width: 540px;
+  }
+
+  .hero-cta {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 48px;
+  }
+
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 32px;
+    background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
+    color: white;
+    text-decoration: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 700;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 20px rgba(124, 101, 181, 0.3);
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 28px rgba(124, 101, 181, 0.4);
+  }
+
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 32px;
+    background: white;
+    color: #7c65b5;
+    text-decoration: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 700;
+    border: 2px solid #7c65b5;
+    transition: all 0.3s ease;
+  }
+
+  .btn-secondary:hover {
+    background: #7c65b5;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(124, 101, 181, 0.2);
+  }
+
+  .hero-stats {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .stat-item {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .stat-item strong {
+    font-size: 28px;
+    font-weight: 900;
+    color: #7c65b5;
+    margin-bottom: 4px;
+  }
+
+  .stat-item span {
+    font-size: 13px;
+    color: #6b5d7a;
+    font-weight: 600;
+  }
+
+  .stat-divider {
+    width: 2px;
+    height: 40px;
+    background: rgba(124, 101, 181, 0.2);
+  }
+
+  .hero-image {
+    animation: slideInRight 0.8s ease;
+  }
+
+  @keyframes slideInRight {
+    from {
+      opacity: 0;
+      transform: translateX(40px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .hero-image-card {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    max-width: 500px;
+    margin: 0 auto;
+  }
+
+  .floating-card {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(124, 101, 181, 0.15);
+    border: 2px solid rgba(124, 101, 181, 0.1);
+    z-index: 10;
+  }
+
+  .card-1 {
+    top: 10%;
+    left: -5%;
+    animation: floatCard1 4s ease-in-out infinite;
+  }
+
+  .card-2 {
+    top: 50%;
+    right: -5%;
+    animation: floatCard2 5s ease-in-out infinite;
+  }
+
+  .card-3 {
+    bottom: 15%;
+    left: 5%;
+    animation: floatCard3 4.5s ease-in-out infinite;
+  }
+
+  @keyframes floatCard1 {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-20px); }
+  }
+
+  @keyframes floatCard2 {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-15px); }
+  }
+
+  @keyframes floatCard3 {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-18px); }
+  }
+
+  .card-icon {
+    font-size: 28px;
+  }
+
+  .card-text strong {
+    display: block;
+    font-size: 14px;
+    font-weight: 700;
+    color: #2d1f3e;
+    margin-bottom: 2px;
+  }
+
+  .card-text span {
+    font-size: 12px;
+    color: #9b8fab;
+    font-weight: 600;
+  }
+
+  .hero-image-main {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+
+  .hero-image-emoji {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 80px;
+    animation: pulse 3s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); }
+    50% { transform: translate(-50%, -50%) scale(1.1); }
+  }
+
+  /* Sections Container */
+  .section-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  .section-header {
+    text-align: center;
+    margin-bottom: 60px;
+  }
+
+  .section-title {
+    font-size: 42px;
+    font-weight: 900;
+    color: #2d1f3e;
+    margin-bottom: 16px;
+    letter-spacing: -1px;
+  }
+
+  .section-subtitle {
+    font-size: 18px;
+    color: #6b5d7a;
+    max-width: 600px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
+  /* How It Works */
+  .how-it-works {
+    padding: 100px 24px;
+    background: white;
+  }
+
+  .steps-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 40px;
+  }
+
+  .step-card {
+    text-align: center;
+    position: relative;
+    padding: 40px 32px;
+    background: linear-gradient(135deg, rgba(124, 101, 181, 0.03) 0%, rgba(169, 150, 221, 0.03) 100%);
+    border-radius: 20px;
+    border: 2px solid rgba(124, 101, 181, 0.08);
+    transition: all 0.3s ease;
+  }
+
+  .step-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 12px 40px rgba(124, 101, 181, 0.15);
+    border-color: #7c65b5;
+  }
+
+  .step-number {
+    position: absolute;
+    top: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 900;
+    box-shadow: 0 4px 16px rgba(124, 101, 181, 0.3);
+  }
+
+  .step-icon {
+    font-size: 64px;
+    margin-bottom: 20px;
+  }
+
+  .step-card h3 {
+    font-size: 22px;
+    font-weight: 800;
+    color: #2d1f3e;
+    margin-bottom: 12px;
+  }
+
+  .step-card p {
+    font-size: 15px;
+    color: #6b5d7a;
+    line-height: 1.6;
+  }
+
+  /* Specialties */
+  .specialties {
+    padding: 100px 24px;
+    background: linear-gradient(135deg, #f4f2fa 0%, #e8e4f7 50%, #ddd8f0 100%);
+  }
+
+  .specialties-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 20px;
+    margin-bottom: 48px;
+  }
+
+  .specialty-card {
+    background: white;
+    padding: 28px;
+    border-radius: 16px;
+    text-align: center;
+    text-decoration: none;
+    border: 2px solid rgba(124, 101, 181, 0.08);
+    transition: all 0.3s ease;
+  }
+
+  .specialty-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 12px 40px rgba(124, 101, 181, 0.2);
+    border-color: #7c65b5;
+  }
+
+  .specialty-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+  }
+
+  .specialty-card h3 {
+    font-size: 17px;
+    font-weight: 700;
+    color: #2d1f3e;
+    margin-bottom: 8px;
+  }
+
+  .specialty-count {
+    font-size: 13px;
+    color: #7c65b5;
+    font-weight: 600;
+  }
+
+  .specialties-cta {
+    text-align: center;
+  }
+
+  .btn-outline {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 32px;
+    background: white;
+    color: #7c65b5;
+    text-decoration: none;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 700;
+    border: 2px solid #7c65b5;
+    transition: all 0.3s ease;
+  }
+
+  .btn-outline:hover {
+    background: #7c65b5;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(124, 101, 181, 0.3);
+  }
+
+  /* Benefits */
+  .benefits {
+    padding: 100px 24px;
+    background: white;
+  }
+
+  .benefits-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 80px;
+    align-items: center;
+  }
+
+  .benefits-intro {
+    font-size: 17px;
+    color: #6b5d7a;
+    line-height: 1.7;
+    margin-bottom: 40px;
+  }
+
+  .benefits-list {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  .benefit-item {
+    display: flex;
+    gap: 20px;
+  }
+
+  .benefit-icon {
+    width: 56px;
+    height: 56px;
+    background: linear-gradient(135deg, rgba(124, 101, 181, 0.1) 0%, rgba(169, 150, 221, 0.1) 100%);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .benefit-icon svg {
+    color: #7c65b5;
+  }
+
+  .benefit-text h3 {
+    font-size: 18px;
+    font-weight: 800;
+    color: #2d1f3e;
+    margin-bottom: 6px;
+  }
+
+  .benefit-text p {
+    font-size: 15px;
+    color: #6b5d7a;
+    line-height: 1.6;
+  }
+
+  .benefits-visual {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .visual-card {
+    width: 100%;
+    max-width: 400px;
+    background: white;
+    padding: 28px;
+    border-radius: 20px;
+    box-shadow: 0 12px 48px rgba(124, 101, 181, 0.15);
+    border: 2px solid rgba(124, 101, 181, 0.08);
+    position: relative;
+  }
+
+  .visual-example-badge {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    padding: 6px 14px;
+    background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
+    color: white;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    box-shadow: 0 2px 8px rgba(124, 101, 181, 0.3);
+  }
+
+  .visual-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+    padding-top: 20px;
+  }
+
+  .visual-avatar {
+    width: 56px;
+    height: 56px;
+    background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+  }
+
+  .visual-info strong {
+    display: block;
+    font-size: 16px;
+    font-weight: 800;
+    color: #2d1f3e;
+    margin-bottom: 4px;
+  }
+
+  .visual-info span {
+    font-size: 13px;
+    color: #9b8fab;
+    font-weight: 600;
+  }
+
+  .visual-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .tag {
+    padding: 6px 12px;
+    background: rgba(124, 101, 181, 0.1);
+    color: #7c65b5;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .visual-rating {
+    font-size: 14px;
+    color: #6b5d7a;
+    margin-bottom: 16px;
+  }
+
+  .visual-rating strong {
+    color: #2d1f3e;
+    font-weight: 800;
+  }
+
+  .visual-price {
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    background: linear-gradient(135deg, rgba(124, 101, 181, 0.05) 0%, rgba(169, 150, 221, 0.05) 100%);
+    border-radius: 12px;
+    margin-bottom: 16px;
+  }
+
+  .visual-price span {
+    font-size: 12px;
+    color: #9b8fab;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .visual-price strong {
+    font-size: 28px;
+    font-weight: 900;
+    color: #7c65b5;
+  }
+
+  .visual-features {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .feature-item {
+    display: flex;
+    align-items: center;
+    font-size: 14px;
+    color: #2d1f3e;
+    font-weight: 600;
+    padding: 8px 12px;
+    background: rgba(124, 101, 181, 0.05);
+    border-radius: 8px;
+  }
+
+  /* Therapy Benefits */
+  .therapy-benefits {
+    padding: 100px 24px;
+    background: linear-gradient(135deg, #f4f2fa 0%, #e8e4f7 50%, #ddd8f0 100%);
+  }
+
+  .therapy-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+  }
+
+  .therapy-card {
+    background: white;
+    padding: 32px;
+    border-radius: 16px;
+    text-align: center;
+    border: 2px solid rgba(124, 101, 181, 0.08);
+    transition: all 0.3s ease;
+  }
+
+  .therapy-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 12px 40px rgba(124, 101, 181, 0.2);
+    border-color: #7c65b5;
+  }
+
+  .therapy-icon {
+    font-size: 56px;
+    margin-bottom: 20px;
+  }
+
+  .therapy-card h3 {
+    font-size: 20px;
+    font-weight: 800;
+    color: #2d1f3e;
+    margin-bottom: 12px;
+  }
+
+  .therapy-card p {
+    font-size: 15px;
+    color: #6b5d7a;
+    line-height: 1.6;
+  }
+
+  /* Final CTA */
+  .final-cta {
+    padding: 120px 24px;
+    background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .final-cta::before {
+    content: '';
+    position: absolute;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+    top: -300px;
+    left: -100px;
+    animation: float 20s ease-in-out infinite;
+  }
+
+  .final-cta-content {
+    text-align: center;
+    position: relative;
+    z-index: 2;
+  }
+
+  .final-cta-content h2 {
+    font-size: 48px;
+    font-weight: 900;
+    color: white;
+    margin-bottom: 16px;
+    letter-spacing: -1px;
+  }
+
+  .final-cta-content p {
+    font-size: 20px;
+    color: rgba(255, 255, 255, 0.9);
+    margin-bottom: 40px;
+  }
+
+  .btn-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 18px 40px;
+    background: white;
+    color: #7c65b5;
+    text-decoration: none;
+    border-radius: 14px;
+    font-size: 18px;
+    font-weight: 800;
+    transition: all 0.3s ease;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  }
+
+  .btn-cta:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.25);
+  }
+
+  /* Psychologist CTA */
+  .psychologist-cta {
+    padding: 60px 24px;
+    background: #2d1f3e;
+  }
+
+  .psychologist-cta-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 32px;
+  }
+
+  .psychologist-info h3 {
+    font-size: 24px;
+    font-weight: 800;
+    color: white;
+    margin-bottom: 8px;
+  }
+
+  .psychologist-info p {
+    font-size: 16px;
+    color: rgba(255, 255, 255, 0.8);
+  }
+
+  .btn-psychologist {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 32px;
+    background: white;
+    color: #2d1f3e;
+    text-decoration: none;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 700;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+  }
+
+  .btn-psychologist:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 24px rgba(255, 255, 255, 0.2);
+  }
+
+  /* Responsive */
+  @media (max-width: 1024px) {
+    .hero-container {
+      grid-template-columns: 1fr;
+      gap: 60px;
+    }
+
+    .hero-image {
+      max-width: 400px;
+      margin: 0 auto;
+    }
+
+    .benefits-grid {
+      grid-template-columns: 1fr;
+      gap: 60px;
+    }
+
+    .benefits-visual {
+      order: -1;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .hero {
+      padding: 120px 20px 60px;
+    }
+
+    .hero-title {
+      font-size: 36px;
+    }
+
+    .hero-subtitle {
+      font-size: 16px;
+    }
+
+    .hero-cta {
+      flex-direction: column;
+    }
+
+    .btn-primary,
+    .btn-secondary {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .hero-stats {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 16px;
+    }
+
+    .stat-divider {
+      display: none;
+    }
+
+    .section-title {
+      font-size: 32px;
+    }
+
+    .section-subtitle {
+      font-size: 16px;
+    }
+
+    .steps-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .specialties-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .therapy-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .psychologist-cta-content {
+      flex-direction: column;
+      text-align: center;
+    }
+
+    .btn-psychologist {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .final-cta-content h2 {
+      font-size: 32px;
+    }
+
+    .final-cta-content p {
+      font-size: 16px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .hero-title {
+      font-size: 28px;
+    }
+
+    .floating-card {
+      display: none;
+    }
+
+    .how-it-works,
+    .specialties,
+    .benefits,
+    .therapy-benefits {
+      padding: 60px 20px;
+    }
+
+    .final-cta {
+      padding: 80px 20px;
+    }
+  }
+`

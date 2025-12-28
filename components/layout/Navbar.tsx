@@ -1,4 +1,3 @@
-// components/layout/Navbar.tsx
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -118,6 +117,13 @@ export default function Navbar() {
               {/* PRÉ-LOGIN */}
               {!user && (
                 <div className="navbar-auth">
+                  <Link 
+                    href="/buscar" 
+                    className={`nav-link ${isActive('/buscar') ? 'active' : ''}`}
+                  >
+                    Buscar Psicólogo
+                  </Link>
+                  
                   <Link href="/login" className="btn-login">
                     Entrar
                   </Link>
@@ -140,11 +146,11 @@ export default function Navbar() {
                     </Link>
                     
                     <Link 
-                      href="/" 
-                      className={`nav-link ${isActive('/') ? 'active' : ''}`}
+                      href="/buscar" 
+                      className={`nav-link ${isActive('/buscar') ? 'active' : ''}`}
                       title="Buscar psicólogos"
                     >
-                      Psicólogos
+                      Buscar Psicólogo
                     </Link>
                   </div>
 
@@ -291,7 +297,46 @@ export default function Navbar() {
         .navbar-auth {
           display: flex;
           align-items: center;
-          gap: 40px;
+          gap: 24px;
+        }
+
+        .nav-link {
+          text-decoration: none;
+          color: #3c2e50;
+          font-weight: 600;
+          font-size: 15px;
+          padding: 10px 20px;
+          border-radius: 10px;
+          transition: all 0.3s ease;
+          white-space: nowrap;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .nav-link::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: -100%;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(169, 150, 221, 0.1), transparent);
+          transition: left 0.5s ease;
+        }
+
+        .nav-link:hover::before {
+          left: 100%;
+        }
+
+        .nav-link:hover {
+          background: rgba(169, 150, 221, 0.1);
+          color: #7c65b5;
+        }
+
+        .nav-link.active {
+          background: rgba(124, 101, 181, 0.15);
+          color: #7c65b5;
+          font-weight: 700;
         }
 
         .btn-login {
@@ -354,45 +399,6 @@ export default function Navbar() {
           position: absolute;
           left: 50%;
           transform: translateX(-50%);
-        }
-
-        .nav-link {
-          text-decoration: none;
-          color: #3c2e50;
-          font-weight: 600;
-          font-size: 15px;
-          padding: 10px 20px;
-          border-radius: 10px;
-          transition: all 0.3s ease;
-          white-space: nowrap;
-          position: relative;
-          overflow: hidden;
-        }
-
-        .nav-link::before {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: -100%;
-          width: 100%;
-          height: 100%;
-          background: linear-gradient(90deg, transparent, rgba(169, 150, 221, 0.1), transparent);
-          transition: left 0.5s ease;
-        }
-
-        .nav-link:hover::before {
-          left: 100%;
-        }
-
-        .nav-link:hover {
-          background: rgba(169, 150, 221, 0.1);
-          color: #7c65b5;
-        }
-
-        .nav-link.active {
-          background: rgba(124, 101, 181, 0.15);
-          color: #7c65b5;
-          font-weight: 700;
         }
 
         .navbar-profile {
@@ -525,6 +531,10 @@ export default function Navbar() {
             gap: 12px;
           }
 
+          .navbar-auth {
+            gap: 16px;
+          }
+
           .nav-link {
             padding: 8px 14px;
             font-size: 14px;
@@ -545,13 +555,18 @@ export default function Navbar() {
           }
 
           .btn-login,
-          .btn-signup {
+          .btn-signup,
+          .nav-link {
             padding: 8px 16px;
             font-size: 14px;
           }
 
           .navbar-center {
             display: none;
+          }
+
+          .navbar-auth {
+            gap: 8px;
           }
 
           .avatar,
@@ -567,7 +582,7 @@ export default function Navbar() {
           }
         }
 
-        @media (max-width: 400px) {
+        @media (max-width: 480px) {
           .btn-login {
             display: none;
           }

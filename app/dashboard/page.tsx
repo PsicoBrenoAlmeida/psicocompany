@@ -1,7 +1,7 @@
-// app/dashboard/page.tsx
+// app/dashboard/page.tsx - ATUALIZADO COM GOOGLE MEET
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/utils/supabaseClient'
@@ -11,6 +11,10 @@ interface Profile {
   user_type: 'patient' | 'psychologist'
   full_name: string
   avatar_url?: string
+  phone?: string
+  bio?: string
+  birth_date?: string
+  city?: string
 }
 
 interface Appointment {
@@ -18,6 +22,10 @@ interface Appointment {
   appointment_date: string
   appointment_time: string
   status: string
+  payment_status: string
+  duration_minutes: number
+  google_meet_link?: string  // ADICIONADO
+  google_calendar_event_id?: string  // ADICIONADO
   psychologist?: {
     full_name: string
     avatar_url?: string
@@ -42,17 +50,45 @@ export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [stats, setStats] = useState<PsychologistStats | null>(null)
+  const [profileIncomplete, setProfileIncomplete] = useState(false)
+  const [cancellingId, setCancellingId] = useState<string | null>(null)
 
-  useEffect(() => {
-    checkUser()
+  const createTimeoutPromise = useCallback((ms: number) => {
+    return new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Timeout: a operação demorou muito')), ms)
+    })
   }, [])
 
-  const checkUser = async () => {
+  const checkProfileCompleteness = useCallback((profileData: Profile) => {
+    const requiredFields = [
+      profileData.full_name,
+      profileData.phone,
+      profileData.bio
+    ]
+    
+    const isComplete = requiredFields.every(field => field && field.trim().length > 0)
+    setProfileIncomplete(!isComplete)
+  }, [])
+
+  const checkUser = useCallback(async () => {
+    const timeoutMs = 10000
+
     try {
       setLoading(true)
-      const { data: { user } } = await supabase.auth.getUser()
+      setError(null)
+
+      if (!navigator.onLine) {
+        throw new Error('Sem conexão com a internet')
+      }
+
+      const userPromise = supabase.auth.getUser()
+      const { data: { user } } = await Promise.race([
+        userPromise,
+        createTimeoutPromise(timeoutMs)
+      ]) as any
       
       if (!user) {
         router.push('/login')
@@ -61,58 +97,95 @@ export default function DashboardPage() {
 
       setUser(user)
 
-      // Buscar perfil
-      const { data: profileData } = await supabase
+      const profilePromise = supabase
         .from('profiles')
-        .select('user_type, full_name, avatar_url')
+        .select('*')
         .eq('user_id', user.id)
         .single()
+
+      const { data: profileData, error: profileError } = await Promise.race([
+        profilePromise,
+        createTimeoutPromise(timeoutMs)
+      ]) as any
+
+      if (profileError) {
+        console.error('Erro ao carregar perfil:', profileError)
+        setError('Erro ao carregar perfil.')
+        return
+      }
 
       if (profileData) {
         setProfile(profileData)
         
         if (profileData.user_type === 'patient') {
+          checkProfileCompleteness(profileData)
           await loadPatientData(user.id)
         } else {
           await loadPsychologistData(user.id)
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao carregar dashboard:', error)
+      
+      if (error.message?.includes('Timeout')) {
+        setError('A conexão está muito lenta. Tente novamente.')
+      } else if (error.message?.includes('internet')) {
+        setError('Sem conexão com a internet. Verifique sua rede.')
+      } else {
+        setError('Erro ao carregar dados. Tente atualizar a página.')
+      }
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase, router, createTimeoutPromise, checkProfileCompleteness])
+
+  useEffect(() => {
+    checkUser()
+  }, [checkUser])
 
   const loadPatientData = async (userId: string) => {
+    const timeoutMs = 10000
+
     try {
-      // Buscar ID do paciente
-      const { data: patientData } = await supabase
+      const patientPromise = supabase
         .from('patients')
         .select('id')
         .eq('user_id', userId)
         .single()
 
+      const { data: patientData } = await Promise.race([
+        patientPromise,
+        createTimeoutPromise(timeoutMs)
+      ]) as any
+
       if (!patientData) return
 
-      // Buscar agendamentos do paciente
-      const { data: appointmentsData } = await supabase
+      // ATUALIZADO: Adicionado google_meet_link e google_calendar_event_id
+      const appointmentsPromise = supabase
         .from('appointments')
         .select(`
           id,
           appointment_date,
           appointment_time,
           status,
-          psychologist_id
+          payment_status,
+          duration_minutes,
+          psychologist_id,
+          google_meet_link,
+          google_calendar_event_id
         `)
         .eq('patient_id', patientData.id)
         .order('appointment_date', { ascending: true })
         .order('appointment_time', { ascending: true })
 
+      const { data: appointmentsData } = await Promise.race([
+        appointmentsPromise,
+        createTimeoutPromise(timeoutMs)
+      ]) as any
+
       if (appointmentsData) {
-        // Buscar dados dos psicólogos
         const enrichedAppointments = await Promise.all(
-          appointmentsData.map(async (apt) => {
+          appointmentsData.map(async (apt: any) => {
             const { data: psychData } = await supabase
               .from('psychologists')
               .select('user_id, specialties')
@@ -147,34 +220,48 @@ export default function DashboardPage() {
   }
 
   const loadPsychologistData = async (userId: string) => {
+    const timeoutMs = 10000
+
     try {
-      // Buscar ID e stats do psicólogo
-      const { data: psychData } = await supabase
+      const psychPromise = supabase
         .from('psychologists')
         .select('id, rating, total_reviews')
         .eq('user_id', userId)
         .single()
 
+      const { data: psychData } = await Promise.race([
+        psychPromise,
+        createTimeoutPromise(timeoutMs)
+      ]) as any
+
       if (!psychData) return
 
-      // Buscar agendamentos do psicólogo
-      const { data: appointmentsData } = await supabase
+      // ATUALIZADO: Adicionado google_meet_link e google_calendar_event_id
+      const appointmentsPromise = supabase
         .from('appointments')
         .select(`
           id,
           appointment_date,
           appointment_time,
           status,
-          patient_id
+          payment_status,
+          duration_minutes,
+          patient_id,
+          google_meet_link,
+          google_calendar_event_id
         `)
         .eq('psychologist_id', psychData.id)
         .order('appointment_date', { ascending: true })
         .order('appointment_time', { ascending: true })
 
+      const { data: appointmentsData } = await Promise.race([
+        appointmentsPromise,
+        createTimeoutPromise(timeoutMs)
+      ]) as any
+
       if (appointmentsData) {
-        // Buscar dados dos pacientes
         const enrichedAppointments = await Promise.all(
-          appointmentsData.map(async (apt) => {
+          appointmentsData.map(async (apt: any) => {
             const { data: patientData } = await supabase
               .from('patients')
               .select('user_id')
@@ -202,14 +289,13 @@ export default function DashboardPage() {
 
         setAppointments(enrichedAppointments)
 
-        // Calcular stats
         const today = new Date().toISOString().split('T')[0]
         const upcoming = enrichedAppointments.filter(
-          apt => apt.appointment_date >= today && apt.status !== 'cancelled'
+          (apt: any) => apt.appointment_date >= today && apt.status !== 'cancelled' && apt.payment_status === 'paid'
         ).length
 
         setStats({
-          total_sessions: enrichedAppointments.filter(apt => apt.status === 'completed').length,
+          total_sessions: enrichedAppointments.filter((apt: any) => apt.status === 'completed').length,
           upcoming_sessions: upcoming,
           rating: psychData.rating || 0,
           total_reviews: psychData.total_reviews || 0
@@ -220,7 +306,35 @@ export default function DashboardPage() {
     }
   }
 
-  const getStatusBadge = (status: string) => {
+  const handleCancelAppointment = async (appointmentId: string) => {
+    if (!confirm('Tem certeza que deseja cancelar este agendamento?')) return
+
+    try {
+      setCancellingId(appointmentId)
+
+      const { error } = await supabase
+        .from('appointments')
+        .update({ status: 'cancelled' })
+        .eq('id', appointmentId)
+
+      if (error) throw error
+
+      // Recarregar appointments
+      await checkUser()
+      alert('Agendamento cancelado com sucesso!')
+    } catch (error) {
+      console.error('Erro ao cancelar agendamento:', error)
+      alert('Erro ao cancelar agendamento. Tente novamente.')
+    } finally {
+      setCancellingId(null)
+    }
+  }
+
+  const getStatusBadge = (status: string, paymentStatus: string) => {
+    if (paymentStatus === 'pending') {
+      return { text: 'Aguardando Pagamento', class: 'status-pending-payment' }
+    }
+
     const badges = {
       scheduled: { text: 'Agendada', class: 'status-scheduled' },
       confirmed: { text: 'Confirmada', class: 'status-confirmed' },
@@ -246,17 +360,24 @@ export default function DashboardPage() {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
   }
 
+  const getPendingPaymentAppointments = () => {
+    return appointments.filter(apt => apt.payment_status === 'pending' && apt.status !== 'cancelled')
+  }
+
   const getUpcomingAppointments = () => {
     const today = new Date().toISOString().split('T')[0]
     return appointments.filter(
-      apt => apt.appointment_date >= today && apt.status !== 'cancelled'
+      apt => apt.appointment_date >= today && 
+             apt.status !== 'cancelled' && 
+             apt.payment_status === 'paid'
     )
   }
 
   const getPastAppointments = () => {
     const today = new Date().toISOString().split('T')[0]
     return appointments.filter(
-      apt => apt.appointment_date < today || apt.status === 'completed'
+      apt => (apt.appointment_date < today || apt.status === 'completed') &&
+             apt.payment_status === 'paid'
     )
   }
 
@@ -268,6 +389,15 @@ export default function DashboardPage() {
             <div className="loading">
               <div className="spinner"></div>
               <p>Carregando dashboard...</p>
+              <button 
+                className="btn-cancel-loading"
+                onClick={() => {
+                  setLoading(false)
+                  router.push('/')
+                }}
+              >
+                Cancelar
+              </button>
             </div>
           </div>
         </main>
@@ -276,6 +406,32 @@ export default function DashboardPage() {
     )
   }
 
+  if (error) {
+    return (
+      <>
+        <main className="dashboard-page">
+          <div className="dashboard-container">
+            <div className="error-state">
+              <div className="error-icon">⚠️</div>
+              <h2>Erro ao Carregar Dashboard</h2>
+              <p>{error}</p>
+              <div className="error-actions">
+                <button className="btn-retry" onClick={checkUser}>
+                  Tentar Novamente
+                </button>
+                <button className="btn-back-error" onClick={() => router.push('/')}>
+                  Voltar à Página Inicial
+                </button>
+              </div>
+            </div>
+          </div>
+        </main>
+        <style jsx>{styles}</style>
+      </>
+    )
+  }
+
+  const pendingPaymentAppointments = getPendingPaymentAppointments()
   const upcomingAppointments = getUpcomingAppointments()
   const pastAppointments = getPastAppointments()
 
@@ -299,6 +455,29 @@ export default function DashboardPage() {
               Editar Perfil
             </Link>
           </div>
+
+          {/* Profile Incomplete Warning (apenas para pacientes) */}
+          {profile?.user_type === 'patient' && profileIncomplete && (
+            <div className="warning-banner">
+              <div className="warning-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                  <line x1="12" y1="9" x2="12" y2="13"></line>
+                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+              </div>
+              <div className="warning-content">
+                <h3>Complete seu perfil para uma melhor experiência</h3>
+                <p>
+                  Adicione informações como telefone e uma breve descrição sobre você. 
+                  Isso ajuda os psicólogos a conhecerem melhor seu contexto antes da primeira sessão.
+                </p>
+              </div>
+              <Link href="/perfil" className="btn-complete-profile">
+                Completar Perfil
+              </Link>
+            </div>
+          )}
 
           {/* Stats Cards (apenas para psicólogo) */}
           {profile?.user_type === 'psychologist' && stats && (
@@ -348,7 +527,7 @@ export default function DashboardPage() {
           {/* Quick Actions (apenas para paciente) */}
           {profile?.user_type === 'patient' && (
             <div className="quick-actions">
-              <Link href="/psicologos" className="action-card primary">
+              <Link href="/buscar" className="action-card primary">
                 <div className="action-icon">
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <circle cx="11" cy="11" r="8"></circle>
@@ -360,6 +539,68 @@ export default function DashboardPage() {
                   <p>Encontre o profissional ideal</p>
                 </div>
               </Link>
+            </div>
+          )}
+
+          {/* Aguardando Pagamento (apenas para paciente) */}
+          {profile?.user_type === 'patient' && pendingPaymentAppointments.length > 0 && (
+            <div className="section payment-pending-section">
+              <div className="section-header">
+                <h2>⏳ Aguardando Pagamento</h2>
+                <span className="count-badge urgent">{pendingPaymentAppointments.length}</span>
+              </div>
+
+              <div className="appointments-list">
+                {pendingPaymentAppointments.map(apt => (
+                  <div key={apt.id} className="appointment-card pending-payment">
+                    <div className="appointment-avatar">
+                      {apt.psychologist?.avatar_url ? (
+                        <img src={apt.psychologist.avatar_url} alt="Avatar" />
+                      ) : (
+                        <div className="avatar-placeholder">
+                          {getInitials(apt.psychologist?.full_name || 'P')}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="appointment-info">
+                      <h3>{apt.psychologist?.full_name}</h3>
+                      {apt.psychologist?.specialties && (
+                        <div className="specialties">
+                          {apt.psychologist.specialties.slice(0, 2).map((spec, idx) => (
+                            <span key={idx} className="specialty-tag">{spec}</span>
+                          ))}
+                        </div>
+                      )}
+                      <div className="appointment-datetime">
+                        <span>📅 {formatDate(apt.appointment_date)}</span>
+                        <span>🕐 {formatTime(apt.appointment_time)}</span>
+                      </div>
+                    </div>
+
+                    <div className="appointment-actions">
+                      <span className={`status-badge ${getStatusBadge(apt.status, apt.payment_status).class}`}>
+                        {getStatusBadge(apt.status, apt.payment_status).text}
+                      </span>
+                      <div className="action-buttons">
+                        <Link 
+                          href={`/pagamento/${apt.id}`}
+                          className="btn-action primary"
+                        >
+                          💳 Finalizar Pagamento
+                        </Link>
+                        <button 
+                          className="btn-action danger"
+                          onClick={() => handleCancelAppointment(apt.id)}
+                          disabled={cancellingId === apt.id}
+                        >
+                          {cancellingId === apt.id ? 'Cancelando...' : '❌ Cancelar Tentativa'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -388,7 +629,7 @@ export default function DashboardPage() {
                   }
                 </p>
                 {profile?.user_type === 'patient' && (
-                  <Link href="/psicologos" className="btn-empty">
+                  <Link href="/buscar" className="btn-empty">
                     Buscar Psicólogos
                   </Link>
                 )}
@@ -438,9 +679,44 @@ export default function DashboardPage() {
                     </div>
 
                     <div className="appointment-actions">
-                      <span className={`status-badge ${getStatusBadge(apt.status).class}`}>
-                        {getStatusBadge(apt.status).text}
+                      <span className={`status-badge ${getStatusBadge(apt.status, apt.payment_status).class}`}>
+                        {getStatusBadge(apt.status, apt.payment_status).text}
                       </span>
+                      
+                      <div className="action-buttons">
+                        {/* NOVO: Botão Google Meet */}
+                        {apt.google_meet_link && (
+                          <a
+                            href={apt.google_meet_link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn-meet"
+                          >
+                            <svg className="meet-icon" width="18" height="18" viewBox="0 0 24 24" fill="none">
+                              <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" fill="currentColor"/>
+                            </svg>
+                            Entrar no Meet
+                          </a>
+                        )}
+                        
+                        {profile?.user_type === 'patient' && (
+                          <>
+                            <button 
+                              className="btn-action secondary"
+                              onClick={() => alert('Função de remarcar em desenvolvimento')}
+                            >
+                              📅 Remarcar
+                            </button>
+                            <button 
+                              className="btn-action danger"
+                              onClick={() => handleCancelAppointment(apt.id)}
+                              disabled={cancellingId === apt.id}
+                            >
+                              {cancellingId === apt.id ? 'Cancelando...' : '❌ Cancelar'}
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -493,8 +769,8 @@ export default function DashboardPage() {
                     </div>
 
                     <div className="appointment-actions">
-                      <span className={`status-badge ${getStatusBadge(apt.status).class}`}>
-                        {getStatusBadge(apt.status).text}
+                      <span className={`status-badge ${getStatusBadge(apt.status, apt.payment_status).class}`}>
+                        {getStatusBadge(apt.status, apt.payment_status).text}
                       </span>
                     </div>
                   </div>
@@ -533,7 +809,7 @@ const styles = `
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 40px;
+    margin-bottom: 32px;
     flex-wrap: wrap;
     gap: 20px;
   }
@@ -564,6 +840,155 @@ const styles = `
   .btn-profile:hover {
     background: #7c65b5;
     color: white;
+  }
+
+  /* Warning Banner */
+  .warning-banner {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 20px 24px;
+    background: linear-gradient(135deg, rgba(251, 146, 60, 0.1) 0%, rgba(251, 191, 36, 0.1) 100%);
+    border: 2px solid rgba(251, 146, 60, 0.3);
+    border-radius: 16px;
+    margin-bottom: 32px;
+    animation: slideDown 0.5s ease;
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .warning-icon {
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    background: rgba(251, 146, 60, 0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ea580c;
+  }
+
+  .warning-content {
+    flex: 1;
+  }
+
+  .warning-content h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: #9a3412;
+    margin-bottom: 6px;
+  }
+
+  .warning-content p {
+    font-size: 14px;
+    color: #c2410c;
+    line-height: 1.5;
+  }
+
+  .btn-complete-profile {
+    flex-shrink: 0;
+    padding: 12px 24px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #f97316 0%, #fb923c 100%);
+    color: white;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+  }
+
+  .btn-complete-profile:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(249, 115, 22, 0.3);
+  }
+
+  /* Loading States */
+  .btn-cancel-loading {
+    margin-top: 20px;
+    padding: 10px 24px;
+    border-radius: 8px;
+    border: 2px solid #7c65b5;
+    background: white;
+    color: #7c65b5;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+
+  .btn-cancel-loading:hover {
+    background: #7c65b5;
+    color: white;
+  }
+
+  /* Error State */
+  .error-state {
+    text-align: center;
+    padding: 60px 20px;
+  }
+
+  .error-icon {
+    font-size: 64px;
+    margin-bottom: 20px;
+  }
+
+  .error-state h2 {
+    font-size: 24px;
+    font-weight: 800;
+    color: #2d1f3e;
+    margin-bottom: 12px;
+  }
+
+  .error-state p {
+    font-size: 16px;
+    color: #6b5d7a;
+    margin-bottom: 32px;
+  }
+
+  .error-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .btn-retry,
+  .btn-back-error {
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: none;
+  }
+
+  .btn-retry {
+    background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
+    color: white;
+  }
+
+  .btn-retry:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(124, 101, 181, 0.3);
+  }
+
+  .btn-back-error {
+    background: white;
+    color: #7c65b5;
+    border: 2px solid #7c65b5;
+  }
+
+  .btn-back-error:hover {
+    background: rgba(124, 101, 181, 0.05);
   }
 
   /* Stats Grid (Psicólogo) */
@@ -677,6 +1102,11 @@ const styles = `
     box-shadow: 0 4px 16px rgba(124, 101, 181, 0.08);
   }
 
+  .payment-pending-section {
+    background: linear-gradient(135deg, rgba(251, 146, 60, 0.05) 0%, rgba(251, 191, 36, 0.05) 100%);
+    border: 2px solid rgba(251, 146, 60, 0.2);
+  }
+
   .section-header {
     display: flex;
     align-items: center;
@@ -697,6 +1127,17 @@ const styles = `
     font-weight: 700;
     padding: 4px 12px;
     border-radius: 20px;
+  }
+
+  .count-badge.urgent {
+    background: rgba(251, 146, 60, 0.2);
+    color: #ea580c;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
   }
 
   /* Empty State */
@@ -753,11 +1194,21 @@ const styles = `
     border-radius: 12px;
     border: 2px solid rgba(124, 101, 181, 0.1);
     transition: all 0.3s ease;
+    background: white;
   }
 
   .appointment-card:hover {
     border-color: #7c65b5;
     box-shadow: 0 4px 16px rgba(124, 101, 181, 0.1);
+  }
+
+  .appointment-card.pending-payment {
+    border-color: rgba(251, 146, 60, 0.3);
+    background: rgba(251, 146, 60, 0.02);
+  }
+
+  .appointment-card.pending-payment:hover {
+    border-color: #f97316;
   }
 
   .appointment-card.past {
@@ -821,6 +1272,10 @@ const styles = `
 
   .appointment-actions {
     flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-end;
   }
 
   .status-badge {
@@ -848,6 +1303,98 @@ const styles = `
   .status-badge.status-cancelled {
     background: rgba(239, 68, 68, 0.1);
     color: #ef4444;
+  }
+
+  .status-badge.status-pending-payment {
+    background: rgba(251, 146, 60, 0.2);
+    color: #ea580c;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .btn-action {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: none;
+    white-space: nowrap;
+    text-decoration: none;
+    display: inline-block;
+  }
+
+  .btn-action.primary {
+    background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
+    color: white;
+  }
+
+  .btn-action.primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(124, 101, 181, 0.3);
+  }
+
+  .btn-action.secondary {
+    background: white;
+    color: #3b82f6;
+    border: 2px solid #3b82f6;
+  }
+
+  .btn-action.secondary:hover {
+    background: rgba(59, 130, 246, 0.1);
+  }
+
+  .btn-action.danger {
+    background: white;
+    color: #ef4444;
+    border: 2px solid #ef4444;
+  }
+
+  .btn-action.danger:hover {
+    background: rgba(239, 68, 68, 0.1);
+  }
+
+  .btn-action:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* NOVO: Botão Google Meet */
+  .btn-meet {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 18px;
+    background: linear-gradient(135deg, #00897b 0%, #00695c 100%);
+    color: white;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 13px;
+    transition: all 0.3s ease;
+    border: none;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .btn-meet:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 137, 123, 0.4);
+  }
+
+  .btn-meet:active {
+    transform: translateY(0);
+  }
+
+  .meet-icon {
+    flex-shrink: 0;
   }
 
   .btn-see-more {
@@ -908,6 +1455,16 @@ const styles = `
       font-size: 26px;
     }
 
+    .warning-banner {
+      flex-direction: column;
+      text-align: center;
+      padding: 24px 20px;
+    }
+
+    .btn-complete-profile {
+      width: 100%;
+    }
+
     .stats-grid {
       grid-template-columns: 1fr;
     }
@@ -924,11 +1481,33 @@ const styles = `
 
     .appointment-actions {
       width: 100%;
+      align-items: stretch;
+    }
+
+    .action-buttons {
+      flex-direction: column;
+      width: 100%;
+    }
+
+    .btn-action,
+    .btn-meet {
+      width: 100%;
+      text-align: center;
+      justify-content: center;
     }
 
     .status-badge {
       display: block;
       text-align: center;
+    }
+
+    .error-actions {
+      flex-direction: column;
+    }
+
+    .btn-retry,
+    .btn-back-error {
+      width: 100%;
     }
   }
 `
