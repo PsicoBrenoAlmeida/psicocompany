@@ -151,7 +151,7 @@ export default function PagamentoPage({ params }: { params: { appointmentId: str
     }
 
     fetchAppointment()
-  }, [appointmentId, router])
+  }, [appointmentId, router, supabase])
 
   // Gerar pagamento
   useEffect(() => {
@@ -255,17 +255,19 @@ export default function PagamentoPage({ params }: { params: { appointmentId: str
 
         setLoading(false)
         addLog('Processo de pagamento concluído')
-      } catch (err: any) {
+      } catch (err) {
         console.error('Erro completo:', err)
-        addLog(`Erro catch na criação do pagamento: ${err.message || err}`)
-        addLog(`Stack trace: ${err.stack || 'N/A'}`)
-        setError(`Erro ao gerar pagamento: ${err.message || 'Erro desconhecido'}`)
+        const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido'
+        const errorStack = err instanceof Error ? err.stack : 'N/A'
+        addLog(`Erro catch na criação do pagamento: ${errorMessage}`)
+        addLog(`Stack trace: ${errorStack || 'N/A'}`)
+        setError(`Erro ao gerar pagamento: ${errorMessage}`)
         setLoading(false)
       }
     }
 
     createPayment()
-  }, [appointment, appointmentId, router])
+  }, [appointment, appointmentId, router, supabase])
 
   // Timer countdown
   useEffect(() => {
@@ -303,7 +305,7 @@ export default function PagamentoPage({ params }: { params: { appointmentId: str
     }, 3000)
 
     return () => clearInterval(interval)
-  }, [appointment, appointmentId, router])
+  }, [appointment, appointmentId, router, supabase])
 
   // Copiar código PIX
   function copyPixCode() {
@@ -664,6 +666,7 @@ export default function PagamentoPage({ params }: { params: { appointmentId: str
                       {qrCodeImage && (
                         <div className="qrcode-wrapper">
                           <div className="qrcode-frame">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img 
                               src={qrCodeImage} 
                               alt="QR Code PIX"
@@ -729,7 +732,7 @@ export default function PagamentoPage({ params }: { params: { appointmentId: str
                           <div className="step-number">2</div>
                           <div className="step-content">
                             <strong>Escolha pagar com PIX</strong>
-                            <span>Selecione a opção "PIX" no menu</span>
+                            <span>Selecione a opção &quot;PIX&quot; no menu</span>
                           </div>
                         </li>
                         <li>

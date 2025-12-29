@@ -24,8 +24,8 @@ interface Appointment {
   status: string
   payment_status: string
   duration_minutes: number
-  google_meet_link?: string  // ADICIONADO
-  google_calendar_event_id?: string  // ADICIONADO
+  google_meet_link?: string
+  google_calendar_event_id?: string
   psychologist?: {
     full_name: string
     avatar_url?: string
@@ -73,77 +73,7 @@ export default function DashboardPage() {
     setProfileIncomplete(!isComplete)
   }, [])
 
-  const checkUser = useCallback(async () => {
-    const timeoutMs = 10000
-
-    try {
-      setLoading(true)
-      setError(null)
-
-      if (!navigator.onLine) {
-        throw new Error('Sem conexão com a internet')
-      }
-
-      const userPromise = supabase.auth.getUser()
-      const { data: { user } } = await Promise.race([
-        userPromise,
-        createTimeoutPromise(timeoutMs)
-      ]) as any
-      
-      if (!user) {
-        router.push('/login')
-        return
-      }
-
-      setUser(user)
-
-      const profilePromise = supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', user.id)
-        .single()
-
-      const { data: profileData, error: profileError } = await Promise.race([
-        profilePromise,
-        createTimeoutPromise(timeoutMs)
-      ]) as any
-
-      if (profileError) {
-        console.error('Erro ao carregar perfil:', profileError)
-        setError('Erro ao carregar perfil.')
-        return
-      }
-
-      if (profileData) {
-        setProfile(profileData)
-        
-        if (profileData.user_type === 'patient') {
-          checkProfileCompleteness(profileData)
-          await loadPatientData(user.id)
-        } else {
-          await loadPsychologistData(user.id)
-        }
-      }
-    } catch (error: any) {
-      console.error('Erro ao carregar dashboard:', error)
-      
-      if (error.message?.includes('Timeout')) {
-        setError('A conexão está muito lenta. Tente novamente.')
-      } else if (error.message?.includes('internet')) {
-        setError('Sem conexão com a internet. Verifique sua rede.')
-      } else {
-        setError('Erro ao carregar dados. Tente atualizar a página.')
-      }
-    } finally {
-      setLoading(false)
-    }
-  }, [supabase, router, createTimeoutPromise, checkProfileCompleteness])
-
-  useEffect(() => {
-    checkUser()
-  }, [checkUser])
-
-  const loadPatientData = async (userId: string) => {
+  const loadPatientData = useCallback(async (userId: string) => {
     const timeoutMs = 10000
 
     try {
@@ -156,11 +86,10 @@ export default function DashboardPage() {
       const { data: patientData } = await Promise.race([
         patientPromise,
         createTimeoutPromise(timeoutMs)
-      ]) as any
+      ]) as { data: { id: string } | null; error: unknown }
 
       if (!patientData) return
 
-      // ATUALIZADO: Adicionado google_meet_link e google_calendar_event_id
       const appointmentsPromise = supabase
         .from('appointments')
         .select(`
@@ -181,7 +110,7 @@ export default function DashboardPage() {
       const { data: appointmentsData } = await Promise.race([
         appointmentsPromise,
         createTimeoutPromise(timeoutMs)
-      ]) as any
+      ]) as { data: any[] | null; error: unknown }
 
       if (appointmentsData) {
         const enrichedAppointments = await Promise.all(
@@ -217,9 +146,9 @@ export default function DashboardPage() {
     } catch (error) {
       console.error('Erro ao carregar dados do paciente:', error)
     }
-  }
+  }, [supabase, createTimeoutPromise])
 
-  const loadPsychologistData = async (userId: string) => {
+  const loadPsychologistData = useCallback(async (userId: string) => {
     const timeoutMs = 10000
 
     try {
@@ -232,11 +161,10 @@ export default function DashboardPage() {
       const { data: psychData } = await Promise.race([
         psychPromise,
         createTimeoutPromise(timeoutMs)
-      ]) as any
+      ]) as { data: { id: string; rating: number; total_reviews: number } | null; error: unknown }
 
       if (!psychData) return
 
-      // ATUALIZADO: Adicionado google_meet_link e google_calendar_event_id
       const appointmentsPromise = supabase
         .from('appointments')
         .select(`
@@ -257,7 +185,7 @@ export default function DashboardPage() {
       const { data: appointmentsData } = await Promise.race([
         appointmentsPromise,
         createTimeoutPromise(timeoutMs)
-      ]) as any
+      ]) as { data: any[] | null; error: unknown }
 
       if (appointmentsData) {
         const enrichedAppointments = await Promise.all(
@@ -304,7 +232,79 @@ export default function DashboardPage() {
     } catch (error) {
       console.error('Erro ao carregar dados do psicólogo:', error)
     }
-  }
+  }, [supabase, createTimeoutPromise])
+
+  const checkUser = useCallback(async () => {
+    const timeoutMs = 10000
+
+    try {
+      setLoading(true)
+      setError(null)
+
+      if (!navigator.onLine) {
+        throw new Error('Sem conexão com a internet')
+      }
+
+      const userPromise = supabase.auth.getUser()
+      const { data: { user: authenticatedUser } } = await Promise.race([
+        userPromise,
+        createTimeoutPromise(timeoutMs)
+      ]) as { data: { user: User | null } }
+      
+      if (!authenticatedUser) {
+        router.push('/login')
+        return
+      }
+
+      setUser(authenticatedUser)
+
+      const profilePromise = supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', authenticatedUser.id)
+        .single()
+
+      const { data: profileData, error: profileError } = await Promise.race([
+        profilePromise,
+        createTimeoutPromise(timeoutMs)
+      ]) as { data: Profile | null; error: unknown }
+
+      if (profileError) {
+        console.error('Erro ao carregar perfil:', profileError)
+        setError('Erro ao carregar perfil.')
+        return
+      }
+
+      if (profileData) {
+        setProfile(profileData)
+        
+        if (profileData.user_type === 'patient') {
+          checkProfileCompleteness(profileData)
+          await loadPatientData(authenticatedUser.id)
+        } else {
+          await loadPsychologistData(authenticatedUser.id)
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dashboard:', error)
+      
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
+      
+      if (errorMessage.includes('Timeout')) {
+        setError('A conexão está muito lenta. Tente novamente.')
+      } else if (errorMessage.includes('internet')) {
+        setError('Sem conexão com a internet. Verifique sua rede.')
+      } else {
+        setError('Erro ao carregar dados. Tente atualizar a página.')
+      }
+    } finally {
+      setLoading(false)
+    }
+  }, [supabase, router, createTimeoutPromise, checkProfileCompleteness, loadPatientData, loadPsychologistData])
+
+  useEffect(() => {
+    checkUser()
+  }, [checkUser])
 
   const handleCancelAppointment = async (appointmentId: string) => {
     if (!confirm('Tem certeza que deseja cancelar este agendamento?')) return
@@ -555,6 +555,7 @@ export default function DashboardPage() {
                   <div key={apt.id} className="appointment-card pending-payment">
                     <div className="appointment-avatar">
                       {apt.psychologist?.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img src={apt.psychologist.avatar_url} alt="Avatar" />
                       ) : (
                         <div className="avatar-placeholder">
@@ -641,6 +642,7 @@ export default function DashboardPage() {
                     <div className="appointment-avatar">
                       {profile?.user_type === 'patient' ? (
                         apt.psychologist?.avatar_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
                           <img src={apt.psychologist.avatar_url} alt="Avatar" />
                         ) : (
                           <div className="avatar-placeholder">
@@ -649,6 +651,7 @@ export default function DashboardPage() {
                         )
                       ) : (
                         apt.patient?.avatar_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
                           <img src={apt.patient.avatar_url} alt="Avatar" />
                         ) : (
                           <div className="avatar-placeholder">
@@ -738,6 +741,7 @@ export default function DashboardPage() {
                     <div className="appointment-avatar">
                       {profile?.user_type === 'patient' ? (
                         apt.psychologist?.avatar_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
                           <img src={apt.psychologist.avatar_url} alt="Avatar" />
                         ) : (
                           <div className="avatar-placeholder">
@@ -746,6 +750,7 @@ export default function DashboardPage() {
                         )
                       ) : (
                         apt.patient?.avatar_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
                           <img src={apt.patient.avatar_url} alt="Avatar" />
                         ) : (
                           <div className="avatar-placeholder">

@@ -12,64 +12,65 @@ export default function AuthCallbackPage() {
   const [message, setMessage] = useState('Processando login...')
 
   useEffect(() => {
-    handleCallback()
-  }, [])
+    async function handleCallback() {
+      try {
+        // Pega o código da URL
+        const hashParams = new URLSearchParams(window.location.hash.substring(1))
+        const accessToken = hashParams.get('access_token')
+        const refreshToken = hashParams.get('refresh_token')
 
-  async function handleCallback() {
-    try {
-      // Pega o código da URL
-      const hashParams = new URLSearchParams(window.location.hash.substring(1))
-      const accessToken = hashParams.get('access_token')
-      const refreshToken = hashParams.get('refresh_token')
+        if (!accessToken) {
+          throw new Error('Token de acesso não encontrado')
+        }
 
-      if (!accessToken) {
-        throw new Error('Token de acesso não encontrado')
+        // Seta a sessão no Supabase
+        const { data: { session }, error: sessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken || ''
+        })
+
+        if (sessionError) throw sessionError
+        if (!session) throw new Error('Sessão não criada')
+
+        console.log('Session criada:', session)
+        console.log('Provider token:', session.provider_token)
+        console.log('Provider refresh token:', session.provider_refresh_token)
+
+        // Verificar se é primeiro login
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('user_type')
+          .eq('user_id', session.user.id)
+          .single()
+
+        setStatus('success')
+        setMessage('Login realizado com sucesso!')
+
+        // Aguardar 1 segundo para mostrar mensagem
+        await new Promise(resolve => setTimeout(resolve, 1000))
+
+        // Se não tem perfil criado, redireciona para onboarding
+        if (!profile) {
+          router.push('/onboarding')
+        } else {
+          router.push('/dashboard')
+        }
+
+      } catch (error) {
+        console.error('Erro no callback:', error)
+        const errorMessage = error instanceof Error ? error.message : 'Erro ao processar login'
+        setStatus('error')
+        setMessage(errorMessage)
+
+        // Redireciona para login após 3 segundos
+        setTimeout(() => {
+          router.push('/login')
+        }, 3000)
       }
-
-      // Seta a sessão no Supabase
-      const { data: { session }, error: sessionError } = await supabase.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken || ''
-      })
-
-      if (sessionError) throw sessionError
-      if (!session) throw new Error('Sessão não criada')
-
-      console.log('Session criada:', session)
-      console.log('Provider token:', session.provider_token)
-      console.log('Provider refresh token:', session.provider_refresh_token)
-
-      // Verificar se é primeiro login
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('user_type')
-        .eq('user_id', session.user.id)
-        .single()
-
-      setStatus('success')
-      setMessage('Login realizado com sucesso!')
-
-      // Aguardar 1 segundo para mostrar mensagem
-      await new Promise(resolve => setTimeout(resolve, 1000))
-
-      // Se não tem perfil criado, redireciona para onboarding
-      if (!profile) {
-        router.push('/onboarding')
-      } else {
-        router.push('/dashboard')
-      }
-
-    } catch (error: any) {
-      console.error('Erro no callback:', error)
-      setStatus('error')
-      setMessage(error.message || 'Erro ao processar login')
-
-      // Redireciona para login após 3 segundos
-      setTimeout(() => {
-        router.push('/login')
-      }, 3000)
     }
-  }
+
+    handleCallback()
+  }, [router, supabase])
 
   return (
     <>

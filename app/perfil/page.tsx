@@ -1,7 +1,7 @@
 // app/perfil/page.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabaseClient'
 import { User } from '@supabase/supabase-js'
@@ -39,11 +39,7 @@ export default function PerfilPage() {
 
   const [errors, setErrors] = useState<Partial<ProfileData>>({})
 
-  useEffect(() => {
-    checkUser()
-  }, [])
-
-  const checkUser = async () => {
+  const checkUser = useCallback(async () => {
     try {
       setLoading(true)
       const { data: { user } } = await supabase.auth.getUser()
@@ -80,7 +76,11 @@ export default function PerfilPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase, router])
+
+  useEffect(() => {
+    checkUser()
+  }, [checkUser])
 
   const validateForm = () => {
     const newErrors: Partial<ProfileData> = {}
@@ -192,9 +192,10 @@ export default function PerfilPage() {
       setMessage({ type: 'success', text: 'Perfil atualizado com sucesso!' })
       
       setTimeout(() => setMessage(null), 5000)
-    } catch (error: any) {
+    } catch (error) {
       console.error('Erro ao salvar:', error)
-      setMessage({ type: 'error', text: error.message || 'Erro ao salvar perfil' })
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao salvar perfil'
+      setMessage({ type: 'error', text: errorMessage })
     } finally {
       setSaving(false)
     }
@@ -265,7 +266,10 @@ export default function PerfilPage() {
               <div className="avatar-upload-section">
                 <div className="avatar-wrapper">
                   {profile.avatar_url ? (
-                    <img src={profile.avatar_url} alt="Avatar" className="avatar-image" />
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={profile.avatar_url} alt="Avatar" className="avatar-image" />
+                    </>
                   ) : (
                     <div className="avatar-placeholder">
                       {getInitials()}
