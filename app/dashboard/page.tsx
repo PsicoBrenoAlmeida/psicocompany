@@ -1,4 +1,4 @@
-// app/dashboard/page.tsx - ATUALIZADO COM GOOGLE MEET
+// app/dashboard/page.tsx - VERSÃO FINAL CORRIGIDA
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
@@ -26,6 +26,8 @@ interface Appointment {
   duration_minutes: number
   google_meet_link?: string
   google_calendar_event_id?: string
+  psychologist_id?: string
+  patient_id?: string
   psychologist?: {
     full_name: string
     avatar_url?: string
@@ -47,7 +49,6 @@ interface PsychologistStats {
 export default function DashboardPage() {
   const supabase = createClient()
   const router = useRouter()
-  const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -110,11 +111,11 @@ export default function DashboardPage() {
       const { data: appointmentsData } = await Promise.race([
         appointmentsPromise,
         createTimeoutPromise(timeoutMs)
-      ]) as { data: any[] | null; error: unknown }
+      ]) as { data: Appointment[] | null; error: unknown }
 
       if (appointmentsData) {
         const enrichedAppointments = await Promise.all(
-          appointmentsData.map(async (apt: any) => {
+          appointmentsData.map(async (apt: Appointment) => {
             const { data: psychData } = await supabase
               .from('psychologists')
               .select('user_id, specialties')
@@ -185,11 +186,11 @@ export default function DashboardPage() {
       const { data: appointmentsData } = await Promise.race([
         appointmentsPromise,
         createTimeoutPromise(timeoutMs)
-      ]) as { data: any[] | null; error: unknown }
+      ]) as { data: Appointment[] | null; error: unknown }
 
       if (appointmentsData) {
         const enrichedAppointments = await Promise.all(
-          appointmentsData.map(async (apt: any) => {
+          appointmentsData.map(async (apt: Appointment) => {
             const { data: patientData } = await supabase
               .from('patients')
               .select('user_id')
@@ -219,11 +220,11 @@ export default function DashboardPage() {
 
         const today = new Date().toISOString().split('T')[0]
         const upcoming = enrichedAppointments.filter(
-          (apt: any) => apt.appointment_date >= today && apt.status !== 'cancelled' && apt.payment_status === 'paid'
+          (apt: Appointment) => apt.appointment_date >= today && apt.status !== 'cancelled' && apt.payment_status === 'paid'
         ).length
 
         setStats({
-          total_sessions: enrichedAppointments.filter((apt: any) => apt.status === 'completed').length,
+          total_sessions: enrichedAppointments.filter((apt: Appointment) => apt.status === 'completed').length,
           upcoming_sessions: upcoming,
           rating: psychData.rating || 0,
           total_reviews: psychData.total_reviews || 0
@@ -255,8 +256,6 @@ export default function DashboardPage() {
         router.push('/login')
         return
       }
-
-      setUser(authenticatedUser)
 
       const profilePromise = supabase
         .from('profiles')
