@@ -2,17 +2,19 @@
 
 import { useState } from 'react'
 
+type FiltersType = {
+  search: string
+  specialty: string
+  approach: string
+  modality: string
+  ageGroup: string
+  priceRange: [number, number]
+  gender: string
+}
+
 interface SearchFiltersProps {
-  filters: {
-    search: string
-    specialty: string
-    approach: string
-    modality: string
-    ageGroup: string
-    priceRange: [number, number]
-    gender: string
-  }
-  onFiltersChange: (filters: any) => void
+  filters: FiltersType
+  onFiltersChange: (filters: FiltersType) => void
   onClearFilters: () => void
 }
 

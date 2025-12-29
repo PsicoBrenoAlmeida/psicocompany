@@ -43,9 +43,10 @@ export default function LoginPage() {
       if (error) throw error
 
       // O redirecionamento acontece automaticamente
-    } catch (error: any) {
+    } catch (error) {
       console.error('Erro ao fazer login com Google:', error)
-      showToast(error.message || 'Erro ao fazer login com Google', 'error')
+      const message = error instanceof Error ? error.message : 'Erro ao fazer login com Google'
+      showToast(message, 'error')
       setGoogleLoading(false)
     }
   }
@@ -106,6 +107,7 @@ export default function LoginPage() {
       showToast('Login realizado com sucesso!', 'success')
       router.push('/dashboard')
     } catch (err) {
+      console.error('Erro ao fazer login:', err)
       showToast('Ocorreu um erro ao fazer login. Tente novamente.', 'error')
       setLoading(false)
     }

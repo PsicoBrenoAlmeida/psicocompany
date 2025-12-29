@@ -31,7 +31,7 @@ export default function SignupPage() {
       setGoogleLoading(true)
       setMessage(null)
 
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
@@ -46,11 +46,12 @@ export default function SignupPage() {
       if (error) throw error
 
       // O redirecionamento acontece automaticamente
-    } catch (error: any) {
+    } catch (error) {
       console.error('Erro ao fazer cadastro com Google:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao cadastrar com Google'
       setMessage({ 
         type: 'error', 
-        text: error.message || 'Erro ao cadastrar com Google' 
+        text: errorMessage
       })
       setGoogleLoading(false)
     }
@@ -152,11 +153,12 @@ export default function SignupPage() {
         router.push('/dashboard')
       }, 2000)
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('Erro no cadastro:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao criar conta'
       setMessage({ 
         type: 'error', 
-        text: error.message || 'Erro ao criar conta' 
+        text: errorMessage
       })
     } finally {
       setLoading(false)
