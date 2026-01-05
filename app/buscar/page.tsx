@@ -1,7 +1,8 @@
+// app/buscar/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@/utils/supabaseClient'
+import { createClient } from '@/utils/supabase/client'
 import SearchFilters from '@/components/buscar/SearchFilters'
 import PsychologistsList from '@/components/buscar/PsychologistsList'
 

@@ -1,0 +1,430 @@
+/* app/dashboard/page.module.css */
+
+.dashboardPage {
+  min-height: 100vh;
+  background: #faf9fc;
+  padding: 120px 24px 60px;
+}
+
+.dashboardContainer {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+/* Header */
+.dashboardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.dashboardHeader h1 {
+  font-size: 28px;
+  font-weight: 800;
+  color: #2d1f3e;
+  margin-bottom: 4px;
+}
+
+.dashboardHeader p {
+  color: #6b5d7a;
+  font-size: 15px;
+  margin: 0;
+}
+
+.btnProfile {
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: 2px solid #7c65b5;
+  background: white;
+  color: #7c65b5;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.3s ease;
+}
+
+.btnProfile:hover {
+  background: #7c65b5;
+  color: white;
+}
+
+/* Quick Actions */
+.quickActions {
+  margin-bottom: 24px;
+}
+
+.actionCard {
+  background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  text-decoration: none;
+  transition: all 0.3s ease;
+}
+
+.actionCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(124, 101, 181, 0.3);
+}
+
+.actionIcon {
+  font-size: 32px;
+}
+
+.actionCard h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: white;
+  margin: 0 0 4px 0;
+}
+
+.actionCard p {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0;
+}
+
+/* Section */
+.section {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 12px rgba(124, 101, 181, 0.08);
+}
+
+.sectionWarning {
+  border: 2px solid #f97316;
+  background: #fffbf5;
+}
+
+.section h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #2d1f3e;
+  margin: 0 0 20px 0;
+}
+
+/* Empty State */
+.emptyState {
+  text-align: center;
+  padding: 40px 20px;
+  color: #6b5d7a;
+}
+
+.emptyState p {
+  margin: 0;
+}
+
+.btnEmpty {
+  display: inline-block;
+  margin-top: 16px;
+  padding: 12px 24px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
+  color: white;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.3s ease;
+}
+
+.btnEmpty:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(124, 101, 181, 0.3);
+}
+
+/* Appointments */
+.appointmentsList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.appointmentCard {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border-radius: 12px;
+  border: 2px solid #f0edf5;
+  transition: all 0.3s ease;
+}
+
+.appointmentCard:hover {
+  border-color: #7c65b5;
+}
+
+.appointmentCardPending {
+  border-color: #f97316;
+  background: #fff8f3;
+}
+
+.appointmentAvatar {
+  flex-shrink: 0;
+}
+
+.avatarPlaceholder {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.appointmentInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.appointmentInfo h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #2d1f3e;
+  margin: 0 0 6px 0;
+}
+
+.appointmentDatetime {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  color: #6b5d7a;
+}
+
+.appointmentActions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+/* Status Badges */
+.statusBadge {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.statusScheduled {
+  background: #e0f2fe;
+  color: #0284c7;
+}
+
+.statusConfirmed {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.statusCompleted {
+  background: #f3e8ff;
+  color: #7c3aed;
+}
+
+.statusCancelled {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.statusPendingPayment {
+  background: #ffedd5;
+  color: #ea580c;
+}
+
+/* Action Buttons */
+.actionButtons {
+  display: flex;
+  gap: 8px;
+}
+
+.btnAction {
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.btnActionPrimary {
+  background: #7c65b5;
+  color: white;
+}
+
+.btnActionPrimary:hover {
+  background: #6b5a9e;
+}
+
+.btnActionDanger {
+  background: white;
+  color: #dc2626;
+  border: 1px solid #dc2626;
+}
+
+.btnActionDanger:hover {
+  background: #fef2f2;
+}
+
+.btnAction:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btnMeet {
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: #00897b;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.btnMeet:hover {
+  background: #00796b;
+}
+
+/* Loading */
+.loading {
+  text-align: center;
+  padding: 80px 20px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(124, 101, 181, 0.1);
+  border-top-color: #7c65b5;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 16px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading p {
+  color: #6b5d7a;
+  margin: 0;
+}
+
+/* Error State */
+.errorState {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.errorIcon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.errorState h2 {
+  font-size: 22px;
+  color: #2d1f3e;
+  margin: 0 0 8px 0;
+}
+
+.errorState p {
+  color: #6b5d7a;
+  margin: 0 0 24px 0;
+}
+
+.errorActions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.btnRetry {
+  padding: 12px 24px;
+  border-radius: 10px;
+  background: #7c65b5;
+  color: white;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.3s ease;
+}
+
+.btnRetry:hover {
+  background: #6b5a9e;
+  transform: translateY(-2px);
+}
+
+.btnBack {
+  padding: 12px 24px;
+  border-radius: 10px;
+  background: white;
+  color: #7c65b5;
+  font-weight: 600;
+  border: 2px solid #7c65b5;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.3s ease;
+}
+
+.btnBack:hover {
+  background: rgba(124, 101, 181, 0.05);
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .dashboardPage {
+    padding: 100px 16px 40px;
+  }
+
+  .dashboardHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .dashboardHeader h1 {
+    font-size: 24px;
+  }
+
+  .appointmentCard {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .appointmentActions {
+    width: 100%;
+    align-items: stretch;
+  }
+
+  .actionButtons {
+    width: 100%;
+  }
+
+  .btnAction,
+  .btnMeet {
+    flex: 1;
+    text-align: center;
+  }
+
+  .errorActions {
+    flex-direction: column;
+  }
+
+  .btnRetry,
+  .btnBack {
+    width: 100%;
+  }
+}

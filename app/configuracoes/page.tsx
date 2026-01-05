@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/utils/supabaseClient'
+import { createClient } from '@/utils/supabase/client'
 import { User } from '@supabase/supabase-js'
 
 interface Profile {

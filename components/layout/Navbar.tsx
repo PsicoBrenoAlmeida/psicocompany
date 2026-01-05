@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { createClient } from '@/utils/supabaseClient'
+import { createClient } from '@/utils/supabase/client'
 import { User } from '@supabase/supabase-js'
 
 export default function Navbar() {

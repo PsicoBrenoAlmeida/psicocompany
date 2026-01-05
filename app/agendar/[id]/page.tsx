@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/utils/supabaseClient'
+import { createClient } from '@/utils/supabase/client'
 
 interface Psychologist {
   id: string

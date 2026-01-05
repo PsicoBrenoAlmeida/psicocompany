@@ -1,0 +1,578 @@
+/* app/buscar/[id]/page.module.css */
+
+/* Loading State */
+.loadingPage {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f4f2fa 0%, #e8e4f7 50%, #ddd8f0 100%);
+}
+
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(124, 101, 181, 0.1);
+  border-top-color: #7c65b5;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loadingPage p {
+  color: #6b5d7a;
+  font-size: 16px;
+  font-weight: 500;
+  margin: 0;
+}
+
+/* Error State */
+.errorPage {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f4f2fa 0%, #e8e4f7 50%, #ddd8f0 100%);
+  padding: 20px;
+}
+
+.errorContent {
+  text-align: center;
+  background: white;
+  padding: 60px 40px;
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(124, 101, 181, 0.12);
+  max-width: 500px;
+}
+
+.errorContent svg {
+  color: #ef4444;
+  margin-bottom: 24px;
+}
+
+.errorContent h2 {
+  font-size: 24px;
+  font-weight: 800;
+  color: #2d1f3e;
+  margin: 0 0 12px 0;
+}
+
+.errorContent p {
+  font-size: 16px;
+  color: #6b5d7a;
+  margin: 0 0 28px 0;
+}
+
+.btnBackSearch {
+  display: inline-block;
+  padding: 14px 32px;
+  background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
+  color: white;
+  text-decoration: none;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 15px;
+  transition: all 0.3s ease;
+}
+
+.btnBackSearch:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(124, 101, 181, 0.3);
+}
+
+/* Profile Page */
+.profilePage {
+  min-height: 100vh;
+  background: #fafafa;
+}
+
+.profileHeader {
+  background: linear-gradient(135deg, #f4f2fa 0%, #e8e4f7 50%, #ddd8f0 100%);
+  padding: 100px 24px 24px;
+}
+
+.headerContainer {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #6b5d7a;
+  font-weight: 500;
+}
+
+.breadcrumb a {
+  color: #7c65b5;
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.breadcrumb a:hover {
+  text-decoration: underline;
+}
+
+.profileMain {
+  padding: 40px 24px 80px;
+}
+
+.mainContainer {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.profileGrid {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 32px;
+  align-items: start;
+}
+
+/* Sidebar */
+.profileSidebar {
+  position: sticky;
+  top: 100px;
+}
+
+.avatarCard {
+  background: white;
+  border-radius: 20px;
+  padding: 32px;
+  box-shadow: 0 4px 20px rgba(124, 101, 181, 0.1);
+  border: 2px solid rgba(124, 101, 181, 0.08);
+  text-align: center;
+}
+
+.premiumBadgeLarge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+  color: white;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 12px rgba(251, 191, 36, 0.3);
+}
+
+.avatarWrapper {
+  width: 240px;
+  height: 240px;
+  margin: 0 auto 20px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 4px solid #7c65b5;
+  box-shadow: 0 8px 32px rgba(124, 101, 181, 0.2);
+}
+
+.avatarImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatarPlaceholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #e8e4f7 0%, #ddd8f0 100%);
+  font-size: 64px;
+  font-weight: 900;
+  color: #7c65b5;
+}
+
+.profileName {
+  font-size: 26px;
+  font-weight: 900;
+  color: #2d1f3e;
+  margin: 0 0 6px 0;
+  line-height: 1.2;
+}
+
+.profileCrp {
+  font-size: 14px;
+  color: #9b8fab;
+  font-weight: 600;
+  margin: 0 0 20px 0;
+}
+
+.quickTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.quickTag {
+  padding: 6px 12px;
+  background: rgba(124, 101, 181, 0.08);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b5d7a;
+}
+
+.priceSection {
+  padding: 24px;
+  background: linear-gradient(135deg, rgba(124, 101, 181, 0.05) 0%, rgba(169, 150, 221, 0.05) 100%);
+  border-radius: 16px;
+  margin-bottom: 24px;
+}
+
+.priceInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.priceLabel {
+  font-size: 13px;
+  color: #9b8fab;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.priceValue {
+  font-size: 36px;
+  font-weight: 900;
+  color: #7c65b5;
+}
+
+.btnScheduleMain {
+  width: 100%;
+  padding: 16px;
+  background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 16px rgba(124, 101, 181, 0.25);
+  font-family: inherit;
+}
+
+.btnScheduleMain:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(124, 101, 181, 0.4);
+}
+
+.affinitySection {
+  padding-top: 24px;
+  border-top: 2px solid rgba(124, 101, 181, 0.08);
+}
+
+.affinitySection h4 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #2d1f3e;
+  margin: 0 0 16px 0;
+}
+
+.affinityList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.affinityItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.affinityLabel {
+  font-size: 13px;
+  color: #9b8fab;
+  font-weight: 600;
+}
+
+.affinityValue {
+  font-size: 13px;
+  color: #2d1f3e;
+  font-weight: 700;
+}
+
+/* Content */
+.profileContent {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.contentCard {
+  background: white;
+  border-radius: 20px;
+  padding: 32px;
+  box-shadow: 0 2px 12px rgba(124, 101, 181, 0.08);
+  border: 2px solid rgba(124, 101, 181, 0.08);
+}
+
+.cardTitle {
+  font-size: 22px;
+  font-weight: 800;
+  color: #2d1f3e;
+  margin: 0 0 20px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.countBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  background: rgba(124, 101, 181, 0.1);
+  color: #7c65b5;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.bioText {
+  font-size: 16px;
+  line-height: 1.8;
+  color: #2d1f3e;
+  white-space: pre-wrap;
+  margin: 0;
+}
+
+.tagsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.tagItemLarge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: rgba(124, 101, 181, 0.05);
+  border: 2px solid rgba(124, 101, 181, 0.1);
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #2d1f3e;
+  transition: all 0.2s ease;
+}
+
+.tagItemLarge:hover {
+  background: rgba(124, 101, 181, 0.1);
+  border-color: #7c65b5;
+  transform: translateX(4px);
+}
+
+.tagItemLarge svg {
+  color: #7c65b5;
+  flex-shrink: 0;
+}
+
+.tagItemLargeApproach {
+  background: rgba(59, 130, 246, 0.05);
+  border-color: rgba(59, 130, 246, 0.1);
+}
+
+.tagItemLargeApproach:hover {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: #3b82f6;
+}
+
+.tagItemLargeApproach svg {
+  color: #3b82f6;
+}
+
+.audienceList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.audienceItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, rgba(124, 101, 181, 0.05) 0%, rgba(169, 150, 221, 0.05) 100%);
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #2d1f3e;
+}
+
+.audienceIcon {
+  font-size: 24px;
+}
+
+.educationList {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.educationItem {
+  display: flex;
+  gap: 20px;
+  padding: 20px;
+  background: rgba(124, 101, 181, 0.03);
+  border-left: 4px solid #7c65b5;
+  border-radius: 12px;
+}
+
+.educationYear {
+  flex-shrink: 0;
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
+  color: white;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.educationDetails h4 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #2d1f3e;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* CTA Card */
+.ctaCard {
+  background: linear-gradient(135deg, #7c65b5 0%, #a996dd 100%);
+  border-radius: 20px;
+  padding: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  box-shadow: 0 8px 32px rgba(124, 101, 181, 0.3);
+}
+
+.ctaContent h3 {
+  font-size: 24px;
+  font-weight: 800;
+  color: white;
+  margin: 0 0 8px 0;
+}
+
+.ctaContent p {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0;
+}
+
+.btnScheduleCta {
+  padding: 16px 32px;
+  background: white;
+  color: #7c65b5;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  font-family: inherit;
+}
+
+.btnScheduleCta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .profileGrid {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  .profileSidebar {
+    position: static;
+  }
+
+  .avatarWrapper {
+    width: 200px;
+    height: 200px;
+  }
+}
+
+@media (max-width: 640px) {
+  .profileHeader {
+    padding: 80px 16px 16px;
+  }
+
+  .profileMain {
+    padding: 24px 16px 60px;
+  }
+
+  .avatarCard {
+    padding: 24px;
+  }
+
+  .contentCard {
+    padding: 24px;
+  }
+
+  .cardTitle {
+    font-size: 18px;
+  }
+
+  .tagsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .ctaCard {
+    flex-direction: column;
+    text-align: center;
+    padding: 32px 24px;
+  }
+
+  .btnScheduleCta {
+    width: 100%;
+  }
+
+  .avatarWrapper {
+    width: 160px;
+    height: 160px;
+  }
+
+  .avatarPlaceholder {
+    font-size: 48px;
+  }
+
+  .profileName {
+    font-size: 22px;
+  }
+
+  .priceValue {
+    font-size: 28px;
+  }
+}
